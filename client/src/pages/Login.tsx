@@ -14,10 +14,10 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const success = login(email.trim(), password.trim());
+    const success = await login(email.trim(), password.trim());
     setLoading(false);
     if (success) {
       // Redirect based on role will be handled by the auth context
@@ -52,6 +52,7 @@ export default function Login() {
                   placeholder="Enter your email"
                   className="pl-10"
                   autoComplete="email"
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -68,6 +69,7 @@ export default function Login() {
                   placeholder="Enter your password"
                   className="pl-10"
                   autoComplete="current-password"
+                  disabled={loading}
                 />
               </div>
             </div>

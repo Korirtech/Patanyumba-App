@@ -25,10 +25,16 @@ export default function Register() {
   const [role, setRole] = useState<UserRole>("client");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const success = register({ name: name.trim(), email: email.trim(), phone: phone.trim(), password: password.trim(), role });
+    const success = await register({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      password: password.trim(),
+      role,
+    });
     setLoading(false);
     if (success) {
       navigate("/dashboard");
@@ -50,33 +56,70 @@ export default function Register() {
               <Label htmlFor="reg-name">Full Name</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="reg-name" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" className="pl-10" />
+                <Input
+                  id="reg-name"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your full name"
+                  className="pl-10"
+                  disabled={loading}
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reg-email">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="reg-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" className="pl-10" />
+                <Input
+                  id="reg-email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="pl-10"
+                  disabled={loading}
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reg-phone">Phone</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="reg-phone" type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Enter your phone number" className="pl-10" />
+                <Input
+                  id="reg-phone"
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter your phone number"
+                  className="pl-10"
+                  disabled={loading}
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reg-password">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="reg-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create a password (min 6 chars)" className="pl-10" minLength={6} />
+                <Input
+                  id="reg-password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password (min 6 chars)"
+                  className="pl-10"
+                  minLength={6}
+                  disabled={loading}
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reg-role">I am a</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+              <Select value={role} onValueChange={(v) => setRole(v as UserRole)} disabled={loading}>
                 <SelectTrigger id="reg-role">
                   <SelectValue />
                 </SelectTrigger>

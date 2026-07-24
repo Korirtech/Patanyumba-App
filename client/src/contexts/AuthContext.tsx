@@ -11,106 +11,130 @@ import {
   getSession,
   setSession,
   clearSession,
-  getUsers,
-  saveUsers,
-  generateId,
-  initStore,
 } from "@/lib/store";
+import { loginUser, registerUser, type UserData } from "@/lib/api";
 import { toast } from "sonner";
 
 interface AuthContextValue {
   user: Session | null;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   register: (data: {
     name: string;
     email: string;
     phone: string;
     password: string;
     role: UserRole;
-  }) => boolean;
+  }) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Initialize auth state from localStorage
   useEffect(() => {
-    initStore();
     const session = getSession();
-    if (session) setUser(session);
+    if (session) {
+      setUser(session);
+    }
+    setIsLoading(false);
   }, []);
 
-  const login = useCallback((email: string, password: string): boolean => {
-    const users = getUsers();
-    const found = users.find(
-      (u) => u.email === email && u.password === password
-    );
-    if (!found) {
-      toast.error("Invalid email or password");
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      const result = await loginUser(email, password);
+
+      if (result.error) {
+        toast.error(result.error);
+        return false;
+      }
+
+      if (!result.data) {
+        toast.error("Login failed");
+        return false;
+      }
+
+      const userData = result.data;
+      const session: Session = {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        role: userData.role as UserRole,
+        status: userData.status as "active" | "suspended",
+        createdAt: userData.createdAt,
+      };
+
+      setSession(session);
+      setUser(session);
+      toast.success(`Welcome back, ${userData.name}!`);
+      return true;
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("Login failed");
       return false;
+    } finally {
+      setIsLoading(false);
     }
-    if (found.status === "suspended") {
-      toast.error("Your account has been suspended");
-      return false;
-    }
-    setSession(found);
-    setUser({
-      id: found.id,
-      name: found.name,
-      email: found.email,
-      phone: found.phone,
-      role: found.role,
-      status: found.status,
-      createdAt: found.createdAt,
-    });
-    toast.success(`Welcome back, ${found.name}!`);
-    return true;
   }, []);
 
   const register = useCallback(
-    (data: {
+    async (data: {
       name: string;
       email: string;
       phone: string;
       password: string;
       role: UserRole;
-    }): boolean => {
-      if (data.password.length < 6) {
-        toast.error("Password must be at least 6 characters");
+    }): Promise<boolean> => {
+      try {
+        setIsLoading(true);
+
+        // Validation
+        if (data.password.length < 6) {
+          toast.error("Password must be at least 6 characters");
+          return false;
+        }
+
+        const result = await registerUser(data);
+
+        if (result.error) {
+          toast.error(result.error);
+          return false;
+        }
+
+        if (!result.data) {
+          toast.error("Registration failed");
+          return false;
+        }
+
+        const userData = result.data;
+        const session: Session = {
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone,
+          role: userData.role as UserRole,
+          status: userData.status as "active" | "suspended",
+          createdAt: userData.createdAt,
+        };
+
+        setSession(session);
+        setUser(session);
+        toast.success(`Account created! Welcome ${userData.name}.`);
+        return true;
+      } catch (error) {
+        console.error("Registration error:", error);
+        toast.error("Registration failed");
         return false;
+      } finally {
+        setIsLoading(false);
       }
-      const users = getUsers();
-      if (users.find((u) => u.email === data.email)) {
-        toast.error("Email already registered. Please login.");
-        return false;
-      }
-      const newUser = {
-        id: generateId(),
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        password: data.password,
-        role: data.role,
-        status: "active" as const,
-        createdAt: new Date().toISOString(),
-      };
-      users.push(newUser);
-      saveUsers(users);
-      setSession(newUser);
-      setUser({
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        role: newUser.role,
-        status: newUser.status,
-        createdAt: newUser.createdAt,
-      });
-      toast.success(`Account created! Welcome ${newUser.name}.`);
-      return true;
     },
     []
   );
@@ -123,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, register, logout, isAuthenticated: !!user }}
+      value={{ user, login, register, logout, isAuthenticated: !!user, isLoading }}
     >
       {children}
     </AuthContext.Provider>
