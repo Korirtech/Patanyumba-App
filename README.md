@@ -80,7 +80,7 @@ The application comes pre-seeded with demo users for testing purposes:
 
 | Role     | Email             | Password   |
 |----------|-------------------|------------|
-| Admin    | `admin@pata.com`  | `admin123` |
+| Admin    | `iamkorir200@gmail.com`  | `123456` |
 | Landlord | `john@landlord.com`| `land123` |
 | Client   | `jane@client.com` | `client123` |
 
