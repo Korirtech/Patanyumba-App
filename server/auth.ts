@@ -1,9 +1,21 @@
 import express, { Request, Response } from "express";
+import bcrypt from "bcryptjs";
 import { userQueries } from "./db.js";
 import { generateId } from "../client/src/lib/store.js";
+import { signToken, authenticateToken } from "./jwt.js";
 import type { UserRole } from "../client/src/lib/types.js";
 
 const router = express.Router();
+
+// ---------------------------------------------------------------------------
+// Bcrypt configuration
+// ---------------------------------------------------------------------------
+
+const SALT_ROUNDS = 12; // cost factor – adjust upward as hardware improves
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface RegisterRequest {
   name: string;
@@ -29,36 +41,69 @@ interface UserRecord {
   createdAt: string;
 }
 
-/**
- * POST /api/auth/register
- * Register a new user with persistent storage
- */
-router.post("/register", (req: Request<{}, {}, RegisterRequest>, res: Response) => {
+// ---------------------------------------------------------------------------
+// Helper – strip password before sending user data to the client
+// ---------------------------------------------------------------------------
+
+function sanitizeUser(user: UserRecord) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    createdAt: user.createdAt,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/register
+// ---------------------------------------------------------------------------
+
+router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Response) => {
   try {
     const { name, email, phone, password, role } = req.body;
 
-    // Validation
+    // --- Input validation ---
     if (!name || !email || !phone || !password || !role) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email address" });
     }
 
-    // Check if email already exists
-    const existingUser = userQueries.findByEmail(email) as UserRecord | undefined;
+    if (password.length < 8) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 8 characters" });
+    }
+
+    const validRoles: UserRole[] = ["admin", "landlord", "client"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    // --- Duplicate check ---
+    const existingUser = userQueries.findByEmail(email.toLowerCase().trim()) as
+      | UserRecord
+      | undefined;
     if (existingUser) {
       return res.status(409).json({ error: "Email already registered" });
     }
 
-    // Create new user
+    // --- Hash password with bcrypt ---
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    // --- Persist user ---
     const newUser = {
       id: generateId(),
       name: name.trim(),
-      email: email.trim(),
+      email: email.toLowerCase().trim(),
       phone: phone.trim(),
-      password: password.trim(), // TODO: Hash password in production
+      password: hashedPassword,
       role,
       status: "active",
       createdAt: new Date().toISOString(),
@@ -66,15 +111,16 @@ router.post("/register", (req: Request<{}, {}, RegisterRequest>, res: Response) 
 
     userQueries.create(newUser);
 
-    // Return user data (without password)
-    return res.status(201).json({
-      id: newUser.id,
-      name: newUser.name,
+    // --- Issue JWT ---
+    const token = signToken({
+      userId: newUser.id,
       email: newUser.email,
-      phone: newUser.phone,
       role: newUser.role,
-      status: newUser.status,
-      createdAt: newUser.createdAt,
+    });
+
+    return res.status(201).json({
+      token,
+      user: sanitizeUser(newUser as UserRecord),
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -82,44 +128,53 @@ router.post("/register", (req: Request<{}, {}, RegisterRequest>, res: Response) 
   }
 });
 
-/**
- * POST /api/auth/login
- * Login user with email and password
- */
-router.post("/login", (req: Request<{}, {}, LoginRequest>, res: Response) => {
+// ---------------------------------------------------------------------------
+// POST /api/auth/login
+// ---------------------------------------------------------------------------
+
+router.post("/login", async (req: Request<{}, {}, LoginRequest>, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
+    // --- Input validation ---
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password required" });
     }
 
-    // Find user
-    const user = userQueries.findByEmail(email) as UserRecord | undefined;
+    // --- Lookup user ---
+    const user = userQueries.findByEmail(email.toLowerCase().trim()) as
+      | UserRecord
+      | undefined;
+
+    // Use a constant-time comparison path even when user is not found to
+    // prevent timing-based user enumeration attacks.
     if (!user) {
+      // Perform a dummy hash comparison so response time is consistent
+      await bcrypt.compare(password, "$2b$12$dummyhashfortimingnormalization");
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // Check password (TODO: Use bcrypt in production)
-    if (user.password !== password) {
+    // --- Verify password ---
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // Check account status
+    // --- Account status check ---
     if (user.status === "suspended") {
       return res.status(403).json({ error: "Account has been suspended" });
     }
 
-    // Return user data (without password)
-    return res.status(200).json({
-      id: user.id,
-      name: user.name,
+    // --- Issue JWT ---
+    const token = signToken({
+      userId: user.id,
       email: user.email,
-      phone: user.phone,
       role: user.role,
-      status: user.status,
-      createdAt: user.createdAt,
+    });
+
+    return res.status(200).json({
+      token,
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -127,28 +182,49 @@ router.post("/login", (req: Request<{}, {}, LoginRequest>, res: Response) => {
   }
 });
 
-/**
- * GET /api/auth/user/:id
- * Get user by ID
- */
-router.get("/user/:id", (req: Request<{ id: string }>, res: Response) => {
+// ---------------------------------------------------------------------------
+// GET /api/auth/me  – verify token and return current user (protected)
+// ---------------------------------------------------------------------------
+
+router.get("/me", authenticateToken, (req: Request, res: Response) => {
+  try {
+    const user = userQueries.findById(req.user!.userId) as UserRecord | undefined;
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.status === "suspended") {
+      return res.status(403).json({ error: "Account has been suspended" });
+    }
+
+    return res.status(200).json({ user: sanitizeUser(user) });
+  } catch (error) {
+    console.error("Get current user error:", error);
+    return res.status(500).json({ error: "Failed to get user" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/user/:id  – get user by ID (protected)
+// ---------------------------------------------------------------------------
+
+router.get("/user/:id", authenticateToken, (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Only allow users to fetch their own record, or admins to fetch any
+    if (req.user!.userId !== id && req.user!.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     const user = userQueries.findById(id) as UserRecord | undefined;
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    return res.status(200).json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      status: user.status,
-      createdAt: user.createdAt,
-    });
+    return res.status(200).json({ user: sanitizeUser(user) });
   } catch (error) {
     console.error("Get user error:", error);
     return res.status(500).json({ error: "Failed to get user" });

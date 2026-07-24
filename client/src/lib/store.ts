@@ -387,15 +387,15 @@ export function saveSettings(settings: AppSettings): void {
 export function getSession(): Session | null {
   return getData<Session>(STORAGE_KEYS.session);
 }
-export function setSession(user: User): void {
+export function setSession(userOrSession: User | Session): void {
   const session: Session = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    role: user.role,
-    status: user.status,
-    createdAt: user.createdAt,
+    id: userOrSession.id,
+    name: userOrSession.name,
+    email: userOrSession.email,
+    phone: userOrSession.phone,
+    role: userOrSession.role,
+    status: userOrSession.status,
+    createdAt: userOrSession.createdAt,
   };
   setData(STORAGE_KEYS.session, session);
 }

@@ -10,4 +10,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
     healthCheckPath: /
