@@ -45,7 +45,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Email</p>
-                  <p className="font-semibold">support@patanyumba.co.ke</p>
+                  <p className="font-semibold">iamkorir200@gmail.com</p>
                 </div>
               </div>
             </div>
