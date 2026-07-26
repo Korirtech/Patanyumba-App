@@ -14,16 +14,16 @@ function jsonLimitHandler(
 }
 
 // ---------------------------------------------------------------------------
-// Login limiter – 5 attempts per 15 minutes per IP
+// Login limiter – 5 attempts per 5 minutes per IP
 // Prevents brute-force credential stuffing attacks.
 // ---------------------------------------------------------------------------
 
 export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 5 * 60 * 1000, // 5 minutes
   max: 5,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  message: "Too many login attempts. Please try again in 15 minutes.",
+  message: "Too many login attempts. Please try again in 5 minutes.",
   handler: jsonLimitHandler,
   skipSuccessfulRequests: true, // only count failed attempts toward the limit
 });

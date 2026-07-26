@@ -10,10 +10,11 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
+    if (isLoading) return; // wait for session restoration to finish
     if (!isAuthenticated) {
       navigate("/login");
       return;
@@ -28,7 +29,16 @@ export default function ProtectedRoute({ children, roles }: ProtectedRouteProps)
             : "/client/dashboard";
       navigate(path);
     }
-  }, [isAuthenticated, user, roles, navigate]);
+  }, [isAuthenticated, user, roles, navigate, isLoading]);
+
+  // Show loading spinner while session is being restored
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
