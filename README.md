@@ -228,15 +228,13 @@ patanyumba_project/
 
 ---
 
-# 🔐 Demo Credentials
+# 🔐 Admin Credentials
 
-The application includes demo accounts for testing.
+The application includes an account for Admin logins.
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | iamkorir200@gmail.com | 123456 |
-| Landlord | john@landlord.com | land123 |
-| Client | jane@client.com | client123 |
+| Admin | pakanyumbaadmin@gmail.com | Paka123456 |
 
 > **Note**
 >
