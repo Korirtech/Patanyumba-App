@@ -43,6 +43,7 @@ export interface Property {
   whatsappClicks: number;
   createdAt: string;
   verified: boolean;
+  featured?: boolean;
 }
 
 export interface Favorite {

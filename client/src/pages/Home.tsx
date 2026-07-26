@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Search, MapPin, Home as HomeIcon, ShieldCheck, MessageCircle, TrendingUp, Star, ArrowRight, Building2, Users, Zap } from "lucide-react";
+import { Search, MapPin, Home as HomeIcon, ShieldCheck, MessageCircle, TrendingUp, Star, ArrowRight, Building2, Users, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,15 +12,64 @@ import {
 } from "@/components/ui/select";
 import PropertyCard from "@/components/PropertyCard";
 import { getApprovedProperties, getProperties } from "@/lib/store";
+import { getFeaturedProperties } from "@/lib/api";
+import type { PropertyData } from "@/lib/api";
 import { PROPERTY_TYPES, KENYAN_COUNTIES } from "@/lib/types";
 
 export default function Home() {
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
   const [budget, setBudget] = useState("");
+  const [featured, setFeatured] = useState<PropertyData[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+
+  // Fetch featured properties from the server (admin-managed, featured flag)
+  useEffect(() => {
+    let cancelled = false;
+    setFeaturedLoading(true);
+    getFeaturedProperties().then((result) => {
+      if (cancelled) return;
+      if (!result.error && result.data) {
+        setFeatured(result.data);
+      } else {
+        // Fallback to localStorage-based approved properties if API is unavailable
+        const fallback = getApprovedProperties()
+          .filter((p) => p.featured)
+          .slice(0, 6);
+        setFeatured(
+          fallback.map((p) => ({
+            id: p.id,
+            landlordId: p.landlordId,
+            title: p.title,
+            description: p.description,
+            county: p.county,
+            town: p.town,
+            estate: p.estate,
+            address: p.address,
+            lat: p.lat,
+            lng: p.lng,
+            type: p.type,
+            bedrooms: p.bedrooms,
+            bathrooms: p.bathrooms,
+            price: p.price,
+            deposit: p.deposit,
+            availability: p.availability,
+            status: p.status,
+            verified: p.verified,
+            featured: p.featured ?? false,
+            views: p.views,
+            inquiries: p.inquiries,
+            whatsappClicks: p.whatsappClicks,
+            createdAt: p.createdAt,
+          }))
+        );
+      }
+      setFeaturedLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const approvedProps = getApprovedProperties();
-  const featured = approvedProps.slice(0, 6);
   const allProps = getProperties();
   const countyCounts = KENYAN_COUNTIES.map((c) => ({
     county: c,
@@ -139,16 +188,49 @@ export default function Home() {
           </Link>
         </div>
 
-        {featured.length > 0 ? (
+        {featuredLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : featured.length > 0 ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {featured.map((p) => (
-              <PropertyCard key={p.id} property={p} />
+              <PropertyCard
+                key={p.id}
+                property={{
+                  id: p.id,
+                  landlordId: p.landlordId,
+                  title: p.title,
+                  description: p.description,
+                  county: p.county,
+                  town: p.town,
+                  estate: p.estate,
+                  address: p.address,
+                  lat: p.lat,
+                  lng: p.lng,
+                  type: p.type,
+                  bedrooms: p.bedrooms,
+                  bathrooms: p.bathrooms,
+                  price: p.price,
+                  deposit: p.deposit,
+                  amenities: [],
+                  availability: p.availability as any,
+                  status: p.status as any,
+                  images: [],
+                  views: p.views,
+                  inquiries: p.inquiries,
+                  whatsappClicks: p.whatsappClicks,
+                  createdAt: p.createdAt,
+                  verified: p.verified,
+                  featured: p.featured,
+                }}
+              />
             ))}
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-card p-12 text-center">
             <HomeIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">No properties available yet.</p>
+            <p className="mt-4 text-muted-foreground">No featured properties at the moment. Check back soon.</p>
           </div>
         )}
       </section>

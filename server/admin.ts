@@ -4,6 +4,23 @@ import { requireRole, authenticateToken } from "./jwt.js";
 
 const router = express.Router();
 
+// ---------------------------------------------------------------------------
+// PUBLIC: GET /api/admin/properties/featured – list featured approved properties
+// (no auth required – used by the public Home page)
+// ---------------------------------------------------------------------------
+
+router.get("/properties/featured", (_req: Request, res: Response) => {
+  try {
+    const properties = (propertyQueries.getAll() as PropertyRecord[])
+      .filter((p) => p.status === "approved" && Boolean(p.featured) && p.availability !== "Rented")
+      .map(normalizeProperty);
+    return res.status(200).json({ properties });
+  } catch (error) {
+    console.error("Get featured properties error:", error);
+    return res.status(500).json({ error: "Failed to fetch featured properties" });
+  }
+});
+
 // All admin routes require authentication
 router.use(authenticateToken);
 
@@ -156,10 +173,11 @@ router.get("/properties", requireRole("admin"), (_req: Request, res: Response) =
 router.patch("/properties/:id", requireRole("admin"), (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, verified, featured } = req.body as {
+    const { status, verified, featured, availability } = req.body as {
       status?: string;
       verified?: boolean;
       featured?: boolean;
+      availability?: string;
     };
 
     const property = propertyQueries.findById(id) as PropertyRecord | undefined;
@@ -176,6 +194,17 @@ router.patch("/properties/:id", requireRole("admin"), (req: Request<{ id: string
     }
     if (featured !== undefined) {
       updates.featured = featured ? 1 : 0;
+    }
+    if (availability !== undefined) {
+      const validAvailability = ["Available", "Rented", "Coming Soon"];
+      if (!validAvailability.includes(availability)) {
+        return res.status(400).json({ error: "Invalid availability value" });
+      }
+      updates.availability = availability;
+      // When marking as Rented/booked, automatically remove from featured
+      if (availability === "Rented") {
+        updates.featured = 0;
+      }
     }
 
     if (Object.keys(updates).length === 0) {

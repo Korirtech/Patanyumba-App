@@ -240,6 +240,17 @@ export interface PropertyData {
   createdAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Public API – featured properties (no auth required)
+// ---------------------------------------------------------------------------
+
+export async function getFeaturedProperties(): Promise<ApiResponse<PropertyData[]>> {
+  const result = await apiFetch<{ properties: PropertyData[] }>("/admin/properties/featured");
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.properties };
+}
+
 export async function adminGetProperties(): Promise<ApiResponse<PropertyData[]>> {
   const result = await apiFetch<{ properties: PropertyData[] }>("/admin/properties");
 
@@ -249,7 +260,7 @@ export async function adminGetProperties(): Promise<ApiResponse<PropertyData[]>>
 
 export async function adminUpdateProperty(
   id: string,
-  updates: { status?: string; verified?: boolean; featured?: boolean }
+  updates: { status?: string; verified?: boolean; featured?: boolean; availability?: string }
 ): Promise<ApiResponse<PropertyData>> {
   const result = await apiFetch<{ property: PropertyData }>(`/admin/properties/${id}`, {
     method: "PATCH",

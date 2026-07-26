@@ -15,6 +15,7 @@ import {
   Loader2,
   Star,
   StarOff,
+  CalendarCheck,
 } from "lucide-react";
 import DashboardLayout, { navIcons } from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
@@ -50,6 +51,12 @@ const statusBadge: Record<string, string> = {
   approved: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   rejected: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300",
   hidden: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+};
+
+const availabilityBadge: Record<string, string> = {
+  Available: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  Rented: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300",
+  "Coming Soon": "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
 };
 
 // Default settings (used until server-side settings endpoint is available)
@@ -104,6 +111,7 @@ export default function AdminDashboard() {
       totalProperties: properties.length,
       pending: properties.filter((p) => p.status === "pending").length,
       approved: properties.filter((p) => p.status === "approved").length,
+      featured: properties.filter((p) => p.featured && p.availability !== "Rented").length,
     }),
     [users, properties]
   );
@@ -150,7 +158,39 @@ export default function AdminDashboard() {
     setProperties((prev) =>
       prev.map((p) => (p.id === id ? (result.data! as PropertyData) : p))
     );
-    toast.success(newFeatured ? "Property featured!" : "Featured removed.");
+    toast.success(newFeatured ? "Property is now featured on the Home page!" : "Property removed from featured.");
+  };
+
+  /**
+   * Mark a property as booked/rented.
+   * This sets availability to "Rented" and automatically removes it from
+   * the featured section on the Home page (handled server-side).
+   */
+  const markAsBooked = async (id: string) => {
+    const result = await adminUpdateProperty(id, { availability: "Rented" });
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setProperties((prev) =>
+      prev.map((p) => (p.id === id ? (result.data! as PropertyData) : p))
+    );
+    toast.success("Property marked as booked and removed from featured.");
+  };
+
+  /**
+   * Restore a booked property back to Available.
+   */
+  const markAsAvailable = async (id: string) => {
+    const result = await adminUpdateProperty(id, { availability: "Available" });
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setProperties((prev) =>
+      prev.map((p) => (p.id === id ? (result.data! as PropertyData) : p))
+    );
+    toast.success("Property marked as available.");
   };
 
   const deleteProperty = async (id: string) => {
@@ -247,11 +287,74 @@ export default function AdminDashboard() {
               color="amber"
             />
             <StatCard
-              label="Approved"
-              value={stats.approved}
-              icon={<CheckCircle className="h-6 w-6" />}
+              label="Featured (Live)"
+              value={stats.featured}
+              icon={<Star className="h-6 w-6" />}
               color="teal"
             />
+          </div>
+
+          {/* Featured Properties Panel */}
+          <div className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h3 className="font-display font-bold">Featured Properties</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  These properties are displayed on the Home page. Mark as booked to remove them.
+                </p>
+              </div>
+              <Link href="/admin/properties">
+                <Button variant="ghost" size="sm">
+                  Manage All
+                </Button>
+              </Link>
+            </div>
+            <div className="divide-y divide-border">
+              {properties.filter((p) => p.featured && p.availability !== "Rented").length === 0 ? (
+                <p className="px-6 py-8 text-center text-sm text-muted-foreground">
+                  No featured properties. Go to <strong>Properties</strong> tab to feature a listing.
+                </p>
+              ) : (
+                properties
+                  .filter((p) => p.featured && p.availability !== "Rented")
+                  .map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex flex-wrap items-center gap-3 px-6 py-4"
+                    >
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{p.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.county}, {p.town} · {fmtCurrency(p.price, settings.currency)}/mo
+                          {" · "}
+                          <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${availabilityBadge[p.availability] ?? ""}`}>
+                            {p.availability}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => markAsBooked(p.id)}
+                          className="gap-1.5 text-xs border-rose-300 text-rose-600 hover:bg-rose-50"
+                        >
+                          <CalendarCheck className="h-3.5 w-3.5" /> Mark Booked
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleFeatured(p.id)}
+                          className="gap-1.5 text-xs text-muted-foreground hover:text-amber-600"
+                        >
+                          <StarOff className="h-3.5 w-3.5" /> Unfeature
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
           </div>
 
           {/* Pending Properties */}
@@ -509,6 +612,9 @@ export default function AdminDashboard() {
                       Status
                     </th>
                     <th className="px-4 py-3 text-left font-semibold">
+                      Availability
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold">
                       Verified
                     </th>
                     <th className="px-4 py-3 text-left font-semibold">
@@ -523,7 +629,7 @@ export default function AdminDashboard() {
                   {properties.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={8}
                         className="px-4 py-8 text-center text-sm text-muted-foreground"
                       >
                         No properties found.
@@ -557,6 +663,13 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${availabilityBadge[p.availability] ?? "bg-gray-100 text-gray-600"}`}
+                          >
+                            {p.availability}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
                           {p.verified ? (
                             <BadgeCheck className="h-5 w-5 text-emerald-500" />
                           ) : (
@@ -568,13 +681,15 @@ export default function AdminDashboard() {
                             size="sm"
                             variant="outline"
                             onClick={() => toggleFeatured(p.id)}
+                            disabled={p.availability === "Rented"}
+                            title={p.availability === "Rented" ? "Cannot feature a booked property" : undefined}
                             className={`gap-1.5 text-xs ${
-                              p.featured
+                              p.featured && p.availability !== "Rented"
                                 ? "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
                                 : "text-muted-foreground hover:text-amber-600"
                             }`}
                           >
-                            {p.featured ? (
+                            {p.featured && p.availability !== "Rented" ? (
                               <>
                                 <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" /> Featured
                               </>
@@ -615,6 +730,26 @@ export default function AdminDashboard() {
                                   <XCircle className="h-3.5 w-3.5" /> Reject
                                 </Button>
                               </>
+                            )}
+                            {/* Availability toggle: Mark as Booked / Mark as Available */}
+                            {p.availability !== "Rented" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => markAsBooked(p.id)}
+                                className="gap-1.5 text-xs border-rose-300 text-rose-600 hover:bg-rose-50"
+                              >
+                                <CalendarCheck className="h-3.5 w-3.5" /> Booked
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => markAsAvailable(p.id)}
+                                className="gap-1.5 text-xs border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+                              >
+                                <CheckCircle className="h-3.5 w-3.5" /> Available
+                              </Button>
                             )}
                             <Button
                               size="sm"
