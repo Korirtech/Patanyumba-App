@@ -177,3 +177,110 @@ export async function getUser(id: string): Promise<ApiResponse<UserData>> {
 export function logoutUser(): void {
   clearToken();
 }
+// ---------------------------------------------------------------------------
+// Admin API – users
+// ---------------------------------------------------------------------------
+
+export async function adminGetUsers(): Promise<ApiResponse<UserData[]>> {
+  const result = await apiFetch<{ users: UserData[] }>("/admin/users");
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.users };
+}
+
+export async function adminUpdateUser(
+  id: string,
+  status: "active" | "suspended"
+): Promise<ApiResponse<UserData>> {
+  const result = await apiFetch<{ user: UserData }>(`/admin/users/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.user };
+}
+
+export async function adminDeleteUser(id: string): Promise<ApiResponse<{ message: string }>> {
+  const result = await apiFetch<{ message: string }>(`/admin/users/${id}`, {
+    method: "DELETE",
+  });
+
+  if (result.error) return { error: result.error };
+  return { data: result.data };
+}
+
+// ---------------------------------------------------------------------------
+// Admin API – properties
+// ---------------------------------------------------------------------------
+
+export interface PropertyData {
+  id: string;
+  landlordId: string;
+  title: string;
+  description: string;
+  county: string;
+  town: string;
+  estate: string;
+  address: string;
+  lat: number;
+  lng: number;
+  type: string;
+  bedrooms: number;
+  bathrooms: number;
+  price: number;
+  deposit: number;
+  availability: string;
+  status: string;
+  verified: boolean;
+  views: number;
+  inquiries: number;
+  whatsappClicks: number;
+  createdAt: string;
+}
+
+export async function adminGetProperties(): Promise<ApiResponse<PropertyData[]>> {
+  const result = await apiFetch<{ properties: PropertyData[] }>("/admin/properties");
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.properties };
+}
+
+export async function adminUpdateProperty(
+  id: string,
+  updates: { status?: string; verified?: boolean }
+): Promise<ApiResponse<PropertyData>> {
+  const result = await apiFetch<{ property: PropertyData }>(`/admin/properties/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.property };
+}
+
+export async function adminDeleteProperty(id: string): Promise<ApiResponse<{ message: string }>> {
+  const result = await apiFetch<{ message: string }>(`/admin/properties/${id}`, {
+    method: "DELETE",
+  });
+
+  if (result.error) return { error: result.error };
+  return { data: result.data };
+}
+
+// ---------------------------------------------------------------------------
+// Admin API – settings (read-only from server; fallback to client defaults)
+// ---------------------------------------------------------------------------
+
+export interface SettingsData {
+  currency: string;
+  appName: string;
+  logoUrl: string;
+}
+
+export async function adminGetSettings(): Promise<ApiResponse<SettingsData>> {
+  const result = await apiFetch<{ settings: SettingsData }>("/admin/settings");
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.settings };
+}

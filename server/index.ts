@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { initializeDatabase } from "./db.js";
 import authRouter from "./auth.js";
+import adminRouter from "./admin.js";
 import { apiLimiter, loginLimiter, registerLimiter } from "./rateLimiter.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -55,6 +56,7 @@ async function startServer() {
   // API routes
   // ---------------------------------------------------------------------------
   app.use("/api/auth", authRouter);
+  app.use("/api/admin", adminRouter);
 
   // ---------------------------------------------------------------------------
   // Static file serving (production build)
