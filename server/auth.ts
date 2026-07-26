@@ -1,9 +1,10 @@
+import { randomUUID } from "node:crypto";
 import express, { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { userQueries } from "./db.js";
-import { generateId } from "../client/src/lib/store.js";
 import { signToken, authenticateToken } from "./jwt.js";
-import type { UserRole } from "../client/src/lib/types.js";
+
+type UserRole = "admin" | "landlord" | "client";
 
 const router = express.Router();
 
@@ -99,7 +100,7 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
 
     // --- Persist user ---
     const newUser = {
-      id: generateId(),
+      id: randomUUID(),
       name: name.trim(),
       email: email.toLowerCase().trim(),
       phone: phone.trim(),
