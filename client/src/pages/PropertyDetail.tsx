@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
 import {
   MapPin,
@@ -12,19 +12,21 @@ import {
   CalendarCheck,
   ArrowLeft,
   Home as HomeIcon,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import {
-  getPropertyById,
   getUserById,
   formatCurrency,
   formatDate,
   getSettings,
 } from "@/lib/store";
+import { getPropertyDetail } from "@/lib/api";
 import type { PropertyStatus } from "@/lib/types";
+import type { PropertyData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -47,15 +49,50 @@ export default function PropertyDetail() {
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [activeImg, setActiveImg] = useState(0);
+  const [property, setProperty] = useState<PropertyData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const settings = getSettings();
 
-  const property = id ? getPropertyById(id) : undefined;
+  // Fetch property from server on mount
+  useEffect(() => {
+    const fetchProperty = async () => {
+      if (!id) {
+        setError("Property ID not found");
+        setLoading(false);
+        return;
+      }
 
-  if (!property) {
+      setLoading(true);
+      setError(null);
+      const result = await getPropertyDetail(id);
+      if (result.error) {
+        setError(result.error);
+        setProperty(null);
+      } else {
+        setProperty(result.data || null);
+      }
+      setLoading(false);
+    };
+
+    fetchProperty();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="container py-20 text-center">
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="mt-4 text-muted-foreground">Loading property details...</p>
+      </div>
+    );
+  }
+
+  if (error || !property) {
     return (
       <div className="container py-20 text-center">
         <HomeIcon className="mx-auto h-12 w-12 text-muted-foreground" />
         <h2 className="mt-4 font-display text-xl font-bold">Property not found</h2>
+        {error && <p className="mt-2 text-sm text-muted-foreground">{error}</p>}
         <Link href="/properties">
           <Button variant="outline" className="mt-4 gap-2">
             <ArrowLeft className="h-4 w-4" /> Back to Properties
@@ -100,8 +137,8 @@ export default function PropertyDetail() {
           </p>
         </div>
         <div className="flex gap-2">
-          <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", statusStyles[property.status])}>
-            {statusLabels[property.status]}
+          <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", statusStyles[property.status as PropertyStatus])}>
+            {statusLabels[property.status as PropertyStatus]}
           </span>
           {property.verified && (
             <span className="flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
@@ -125,7 +162,7 @@ export default function PropertyDetail() {
           />
         </div>
         <div className="grid grid-cols-3 gap-3 lg:grid-cols-1">
-          {images.slice(0, 3).map((img, i) => (
+          {images.slice(0, 3).map((img: string, i: number) => (
             <button
               key={i}
               onClick={() => setActiveImg(i)}
@@ -187,7 +224,7 @@ export default function PropertyDetail() {
           <div className="rounded-xl border border-border bg-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">Amenities</h3>
             <div className="flex flex-wrap gap-2">
-              {(property.amenities || ["Water", "Parking", "Security"]).map((a) => (
+              {(property.amenities || ["Water", "Parking", "Security"]).map((a: string) => (
                 <span
                   key={a}
                   className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground"

@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { formatCurrency, getSettings } from "@/lib/store";
 import type { Property, PropertyStatus } from "@/lib/types";
+import type { PropertyData } from "@/lib/api";
 
 const statusStyles: Record<PropertyStatus, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
@@ -22,7 +23,7 @@ const statusLabels: Record<PropertyStatus, string> = {
   hidden: "Hidden",
 };
 
-export default function PropertyCard({ property }: { property: Property }) {
+export default function PropertyCard({ property }: { property: Property | PropertyData }) {
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const settings = getSettings();
@@ -48,8 +49,8 @@ export default function PropertyCard({ property }: { property: Property }) {
           }}
         />
         <div className="absolute left-3 top-3 flex gap-2">
-          <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", statusStyles[property.status])}>
-            {statusLabels[property.status]}
+          <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", statusStyles[property.status as PropertyStatus])}>
+            {statusLabels[property.status as PropertyStatus]}
           </span>
           {property.verified && (
             <span className="flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">

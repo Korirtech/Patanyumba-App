@@ -15,12 +15,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  getProperties,
-  saveProperties,
-  generateId,
-} from "@/lib/store";
-import type { Property, Availability } from "@/lib/types";
+import { addProperty } from "@/lib/api";
+import type { Availability } from "@/lib/types";
 import { PROPERTY_TYPES, KENYAN_COUNTIES, AMENITY_OPTIONS } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -181,7 +177,7 @@ export default function AddProperty() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
@@ -198,9 +194,7 @@ export default function AddProperty() {
     }
 
     setLoading(true);
-    const newProp: Property = {
-      id: generateId(),
-      landlordId: user.id,
+    const result = await addProperty({
       title: form.title.trim(),
       description: form.description.trim(),
       county: form.county,
@@ -215,24 +209,20 @@ export default function AddProperty() {
       price: form.price,
       deposit: form.deposit || form.price * 2,
       amenities: form.amenities,
-      availability: form.availability,
-      status: "pending",
       images:
         form.images.length > 0
           ? form.images
           : [
               "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop",
             ],
-      views: 0,
-      inquiries: 0,
-      whatsappClicks: 0,
-      createdAt: new Date().toISOString(),
-      verified: false,
-    };
-    const all = getProperties();
-    all.push(newProp);
-    saveProperties(all);
+    });
     setLoading(false);
+
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+
     toast.success(
       "Property added! It will be reviewed by admin before going live."
     );
@@ -466,35 +456,24 @@ export default function AddProperty() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bedrooms">Bedrooms</Label>
-              <FieldDescription id={`${formId}-bedrooms-desc`}>
-                Number of bedrooms.
-              </FieldDescription>
+              <Label htmlFor={`${formId}-bedrooms`}>Bedrooms</Label>
               <Input
-                id="bedrooms"
+                id={`${formId}-bedrooms`}
                 type="number"
-                min={0}
-                aria-describedby={`${formId}-bedrooms-desc`}
+                min="0"
                 value={form.bedrooms}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    bedrooms: parseInt(e.target.value) || 0,
-                  })
+                  setForm({ ...form, bedrooms: parseInt(e.target.value) || 0 })
                 }
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bathrooms">Bathrooms</Label>
-              <FieldDescription id={`${formId}-bathrooms-desc`}>
-                Number of bathrooms.
-              </FieldDescription>
+              <Label htmlFor={`${formId}-bathrooms`}>Bathrooms</Label>
               <Input
-                id="bathrooms"
+                id={`${formId}-bathrooms`}
                 type="number"
-                min={0}
-                aria-describedby={`${formId}-bathrooms-desc`}
+                min="0"
                 value={form.bathrooms}
                 onChange={(e) =>
                   setForm({
@@ -506,187 +485,155 @@ export default function AddProperty() {
             </div>
           </div>
 
-          {/* Price & Deposit */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label
                 htmlFor="price"
                 className={errors.price ? "text-destructive" : ""}
               >
-                Price (KSh/month) <span aria-hidden="true">*</span>
+                Monthly Rent (KSh) <span aria-hidden="true">*</span>
               </Label>
               <span className="sr-only">Required field</span>
               <FieldDescription id={priceDescId}>
-                Monthly rent amount in Kenyan Shillings. Must be greater
-                than 0.
+                Enter the monthly rent amount.
               </FieldDescription>
               <Input
                 id="price"
                 type="number"
                 required
-                min={0}
                 aria-required="true"
                 aria-invalid={!!errors.price}
                 aria-describedby={priceDescribedBy}
+                min="0"
                 value={form.price}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    price: parseInt(e.target.value) || 0,
-                  })
+                  setForm({ ...form, price: parseFloat(e.target.value) || 0 })
                 }
-                placeholder="e.g. 45000"
+                placeholder="e.g. 50000"
               />
               <FieldError id={priceErrorId} message={errors.price} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="deposit">Deposit (KSh)</Label>
+              <Label htmlFor={`${formId}-deposit`}>
+                Deposit (KSh)
+              </Label>
               <FieldDescription id={`${formId}-deposit-desc`}>
-                Security deposit amount. Defaults to 2 months' rent if
-                left at 0.
+                Leave blank to auto-calculate as 2x monthly rent.
               </FieldDescription>
               <Input
-                id="deposit"
+                id={`${formId}-deposit`}
                 type="number"
-                min={0}
-                aria-describedby={`${formId}-deposit-desc`}
+                min="0"
                 value={form.deposit}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    deposit: parseInt(e.target.value) || 0,
+                    deposit: parseFloat(e.target.value) || 0,
                   })
                 }
-                placeholder="e.g. 90000"
+                placeholder="Auto-calculated if empty"
               />
             </div>
-          </div>
-
-          {/* Availability */}
-          <div className="space-y-2">
-            <Label htmlFor={`${formId}-availability`}>Availability</Label>
-            <Select
-              value={form.availability}
-              onValueChange={(v) =>
-                setForm({
-                  ...form,
-                  availability: v as Availability,
-                })
-              }
-            >
-              <SelectTrigger id={`${formId}-availability`}>
-                <SelectValue placeholder="Select availability" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Available">Available</SelectItem>
-                <SelectItem value="Rented">Rented</SelectItem>
-                <SelectItem value="Coming Soon">Coming Soon</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
         {/* Amenities */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
           <h3 className="font-display text-lg font-bold">Amenities</h3>
-          <fieldset>
-            <legend className="sr-only">
-              Select the amenities your property offers
-            </legend>
-            <div className="flex flex-wrap gap-3">
-              {AMENITY_OPTIONS.map((a) => (
-                <div key={a} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`amen-${a}`}
-                    checked={form.amenities.includes(a)}
-                    onCheckedChange={() => toggleAmenity(a)}
-                  />
-                  <Label
-                    htmlFor={`amen-${a}`}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {a}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </fieldset>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {AMENITY_OPTIONS.map((a) => (
+              <div key={a} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`amenity-${a}`}
+                  checked={form.amenities.includes(a)}
+                  onCheckedChange={() => toggleAmenity(a)}
+                />
+                <Label
+                  htmlFor={`amenity-${a}`}
+                  className="font-normal cursor-pointer"
+                >
+                  {a}
+                </Label>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Images */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
-          <h3 className="font-display text-lg font-bold">
-            Property Images
-          </h3>
-
+          <h3 className="font-display text-lg font-bold">Images</h3>
           <FieldDescription id={imagesDescId}>
-            Add image URLs for your property. At least one image is
-            recommended.
+            Add image URLs. At least one image is required.
           </FieldDescription>
 
           <div className="flex gap-2">
             <Input
               type="url"
-              aria-describedby={imagesDescribedBy}
+              placeholder="https://example.com/image.jpg"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="Paste image URL..."
-              onKeyDown={(e) =>
-                e.key === "Enter" && (e.preventDefault(), addImage())
-              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addImage();
+                }
+              }}
             />
             <Button
               type="button"
               variant="outline"
-              className="gap-2 shrink-0"
               onClick={addImage}
-              aria-label="Add image URL to the property"
+              className="gap-2"
             >
-              <ImagePlus className="h-4 w-4" /> Add
+              <ImagePlus className="h-4 w-4" />
+              Add
             </Button>
           </div>
 
-          <FieldError id={imagesErrorId} message={errors.images} />
-
           {form.images.length > 0 && (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {form.images.map((img, i) => (
-                <div
-                  key={i}
-                  className="relative aspect-[4/3] overflow-hidden rounded-lg border border-border"
-                >
-                  <img
-                    src={img}
-                    alt={`Property image ${i + 1}`}
-                    className="h-full w-full object-cover"
-                    onError={(e) =>
-                      ((e.target as HTMLImageElement).style.opacity =
-                        "0.3")
-                    }
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(i)}
-                    className="absolute top-1 right-1 rounded-full bg-rose-500 p-1 text-white text-xs"
-                    aria-label={`Remove property image ${i + 1}`}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">
+                {form.images.length} image{form.images.length > 1 ? "s" : ""} added
+              </p>
+              <div className="space-y-1">
+                {form.images.map((img, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3"
                   >
-                    &times;
-                  </button>
-                </div>
-              ))}
+                    <p className="truncate text-sm text-muted-foreground">
+                      {img}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeImage(idx)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* Submit */}
         <div className="flex gap-3">
-          <Button type="submit" className="gap-2" disabled={loading}>
+          <Button
+            type="submit"
+            size="lg"
+            disabled={loading}
+            className="gap-2"
+          >
             <Save className="h-4 w-4" />
-            {loading ? "Saving..." : "Add Property"}
+            {loading ? "Submitting..." : "Submit Property"}
           </Button>
           <Link href="/landlord/dashboard">
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" size="lg">
               Cancel
             </Button>
           </Link>

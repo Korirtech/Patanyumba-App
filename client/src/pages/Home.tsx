@@ -53,6 +53,8 @@ export default function Home() {
             bathrooms: p.bathrooms,
             price: p.price,
             deposit: p.deposit,
+            amenities: p.amenities || [],
+            images: p.images || [],
             availability: p.availability,
             status: p.status,
             verified: p.verified,

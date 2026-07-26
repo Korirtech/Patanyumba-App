@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearch } from "wouter";
-import { Search, Filter, X, Home as HomeIcon } from "lucide-react";
+import { Search, Filter, X, Home as HomeIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,12 +11,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import PropertyCard from "@/components/PropertyCard";
-import { getApprovedProperties } from "@/lib/store";
+import { getAllProperties } from "@/lib/api";
 import { PROPERTY_TYPES } from "@/lib/types";
+import type { PropertyData } from "@/lib/api";
 
 export default function Properties() {
   const search = useSearch();
   const params = new URLSearchParams(search);
+
+  const [properties, setProperties] = useState<PropertyData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState(params.get("search") || "");
   const [type, setType] = useState(params.get("type") || "all");
@@ -26,6 +31,24 @@ export default function Properties() {
     type: params.get("type") || "",
     budget: params.get("budget") || "",
   });
+
+  // Fetch properties from server on mount
+  useEffect(() => {
+    const fetchProperties = async () => {
+      setLoading(true);
+      setError(null);
+      const result = await getAllProperties();
+      if (result.error) {
+        setError(result.error);
+        setProperties([]);
+      } else {
+        setProperties(result.data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchProperties();
+  }, []);
 
   // Sync from URL on navigation
   useEffect(() => {
@@ -39,8 +62,7 @@ export default function Properties() {
   }, [search]);
 
   const filtered = useMemo(() => {
-    const all = getApprovedProperties();
-    let result = all;
+    let result = properties;
     if (applied.search) {
       const s = applied.search.toLowerCase();
       result = result.filter(
@@ -59,7 +81,7 @@ export default function Properties() {
       result = result.filter((p) => p.price <= max);
     }
     return result;
-  }, [applied]);
+  }, [properties, applied]);
 
   const applyFilters = () => {
     setApplied({
@@ -97,10 +119,11 @@ export default function Properties() {
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && applyFilters()}
               className="pl-10"
+              disabled={loading}
             />
           </div>
 
-          <Select value={type} onValueChange={setType}>
+          <Select value={type} onValueChange={setType} disabled={loading}>
             <SelectTrigger className="lg:w-[150px]">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
@@ -112,7 +135,7 @@ export default function Properties() {
             </SelectContent>
           </Select>
 
-          <Select value={budget} onValueChange={setBudget}>
+          <Select value={budget} onValueChange={setBudget} disabled={loading}>
             <SelectTrigger className="lg:w-[140px]">
               <SelectValue placeholder="Max Budget" />
             </SelectTrigger>
@@ -127,25 +150,55 @@ export default function Properties() {
             </SelectContent>
           </Select>
 
-          <Button onClick={applyFilters} className="gap-2 lg:w-auto">
+          <Button onClick={applyFilters} className="gap-2 lg:w-auto" disabled={loading}>
             <Filter className="h-4 w-4" />
             Apply
           </Button>
-          <Button onClick={resetFilters} variant="outline" className="gap-2 lg:w-auto">
+          <Button onClick={resetFilters} variant="outline" className="gap-2 lg:w-auto" disabled={loading}>
             <X className="h-4 w-4" />
             Reset
           </Button>
         </div>
       </div>
 
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="ml-2 text-muted-foreground">Loading properties...</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && !loading && (
+        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
+            Failed to load properties: {error}
+          </p>
+        </div>
+      )}
+
       {/* Results */}
-      {filtered.length > 0 ? (
+      {!loading && !error && filtered.length > 0 && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((p) => (
             <PropertyCard key={p.id} property={p} />
           ))}
         </div>
-      ) : (
+      )}
+
+      {/* Empty state */}
+      {!loading && !error && filtered.length === 0 && properties.length === 0 && (
+        <div className="rounded-xl border border-border bg-card p-12 text-center">
+          <HomeIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+          <p className="mt-4 text-muted-foreground">
+            No properties available yet.
+          </p>
+        </div>
+      )}
+
+      {/* No results state */}
+      {!loading && !error && filtered.length === 0 && properties.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-12 text-center">
           <HomeIcon className="mx-auto h-12 w-12 text-muted-foreground" />
           <p className="mt-4 text-muted-foreground">

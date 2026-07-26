@@ -230,6 +230,8 @@ export interface PropertyData {
   bathrooms: number;
   price: number;
   deposit: number;
+  amenities: string[];
+  images: string[];
   availability: string;
   status: string;
   verified: boolean;
@@ -250,6 +252,58 @@ export async function getFeaturedProperties(): Promise<ApiResponse<PropertyData[
   if (result.error) return { error: result.error };
   return { data: result.data?.properties };
 }
+
+// ---------------------------------------------------------------------------
+// Public API – all approved properties (no auth required)
+// ---------------------------------------------------------------------------
+
+export async function getAllProperties(): Promise<ApiResponse<PropertyData[]>> {
+  const result = await apiFetch<{ properties: PropertyData[] }>("/admin/properties/all");
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.properties };
+}
+
+export async function getPropertyDetail(id: string): Promise<ApiResponse<PropertyData>> {
+  const result = await apiFetch<{ property: PropertyData }>(`/admin/properties/detail/${id}`);
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.property };
+}
+
+// ---------------------------------------------------------------------------
+// Protected API – add property (landlord/admin)
+// ---------------------------------------------------------------------------
+
+export async function addProperty(data: {
+  title: string;
+  description: string;
+  county: string;
+  town: string;
+  estate: string;
+  address: string;
+  lat?: number;
+  lng?: number;
+  type: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  price: number;
+  deposit?: number;
+  amenities?: string[];
+  images?: string[];
+}): Promise<ApiResponse<PropertyData>> {
+  const result = await apiFetch<{ property: PropertyData }>("/admin/properties", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.property };
+}
+
+// ---------------------------------------------------------------------------
+// Admin API – all properties (admin only)
+// ---------------------------------------------------------------------------
 
 export async function adminGetProperties(): Promise<ApiResponse<PropertyData[]>> {
   const result = await apiFetch<{ properties: PropertyData[] }>("/admin/properties");

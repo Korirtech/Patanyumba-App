@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import express, { Request, Response } from "express";
 import { userQueries, propertyQueries, db } from "./db.js";
 import { requireRole, authenticateToken } from "./jwt.js";
@@ -18,6 +19,118 @@ router.get("/properties/featured", (_req: Request, res: Response) => {
   } catch (error) {
     console.error("Get featured properties error:", error);
     return res.status(500).json({ error: "Failed to fetch featured properties" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUBLIC: GET /api/admin/properties/all – list all approved properties
+// (no auth required – used by the public Properties page)
+// ---------------------------------------------------------------------------
+
+router.get("/properties/all", (_req: Request, res: Response) => {
+  try {
+    const properties = (propertyQueries.getAll() as PropertyRecord[])
+      .filter((p) => p.status === "approved")
+      .map(normalizeProperty);
+    return res.status(200).json({ properties });
+  } catch (error) {
+    console.error("Get all properties error:", error);
+    return res.status(500).json({ error: "Failed to fetch properties" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUBLIC: GET /api/admin/properties/detail/:id – get property by ID
+// (no auth required – used by the public Property Detail page)
+// ---------------------------------------------------------------------------
+
+router.get("/properties/detail/:id", (req: Request<{ id: string }>, res: Response) => {
+  try {
+    const { id } = req.params;
+    const property = propertyQueries.findById(id) as PropertyRecord | undefined;
+    if (!property) {
+      return res.status(404).json({ error: "Property not found" });
+    }
+    return res.status(200).json({ property: normalizeProperty(property) });
+  } catch (error) {
+    console.error("Get property detail error:", error);
+    return res.status(500).json({ error: "Failed to fetch property detail" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PROTECTED: POST /api/admin/properties – landlord/admin adds a property
+// (requires auth)
+// ---------------------------------------------------------------------------
+
+router.post("/properties", authenticateToken, (req: Request, res: Response) => {
+  try {
+    const {
+      title,
+      description,
+      county,
+      town,
+      estate,
+      address,
+      lat,
+      lng,
+      type,
+      bedrooms,
+      bathrooms,
+      price,
+      deposit,
+      amenities,
+      images,
+    } = req.body;
+
+    if (!title || !county || !town || !type || !price) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const newProperty = {
+      id: randomUUID(),
+      landlordId: req.user!.userId,
+      title,
+      description,
+      county,
+      town,
+      estate,
+      address,
+      lat: lat || 0,
+      lng: lng || 0,
+      type,
+      bedrooms: bedrooms || 0,
+      bathrooms: bathrooms || 0,
+      price: Number(price),
+      deposit: Number(deposit || 0),
+      availability: "Available",
+      status: "pending",
+      verified: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    propertyQueries.create(newProperty);
+
+    // Save amenities
+    if (Array.isArray(amenities)) {
+      const stmt = db.prepare("INSERT INTO property_amenities (propertyId, amenity) VALUES (?, ?)");
+      for (const amenity of amenities) {
+        stmt.run(newProperty.id, amenity);
+      }
+    }
+
+    // Save images
+    if (Array.isArray(images)) {
+      const stmt = db.prepare("INSERT INTO property_images (propertyId, imageUrl) VALUES (?, ?)");
+      for (const imageUrl of images) {
+        stmt.run(newProperty.id, imageUrl);
+      }
+    }
+
+    return res.status(201).json({ property: normalizeProperty(newProperty as any) });
+  } catch (error) {
+    console.error("Add property error:", error);
+    return res.status(500).json({ error: "Failed to add property" });
   }
 });
 
