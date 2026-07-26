@@ -50,6 +50,7 @@ export function initializeDatabase() {
       availability TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       verified BOOLEAN DEFAULT 0,
+      featured BOOLEAN DEFAULT 0,
       views INTEGER DEFAULT 0,
       inquiries INTEGER DEFAULT 0,
       whatsappClicks INTEGER DEFAULT 0,
@@ -103,6 +104,13 @@ export function initializeDatabase() {
       FOREIGN KEY (userId) REFERENCES users(id)
     )
   `);
+
+  // Migrate – add `featured` column if it does not exist
+  const cols = db.prepare("PRAGMA table_info(properties)").all() as { name: string }[];
+  if (!cols.find((c) => c.name === "featured")) {
+    db.exec("ALTER TABLE properties ADD COLUMN featured BOOLEAN DEFAULT 0");
+    console.log("✓ Migrated: added `featured` column to properties table.");
+  }
 
   // Seed default admin account if it does not already exist
   seedAdminUser();

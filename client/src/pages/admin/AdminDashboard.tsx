@@ -13,6 +13,8 @@ import {
   BadgeCheck,
   BadgeX,
   Loader2,
+  Star,
+  StarOff,
 } from "lucide-react";
 import DashboardLayout, { navIcons } from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
@@ -134,6 +136,21 @@ export default function AdminDashboard() {
       prev.map((p) => (p.id === id ? (result.data! as PropertyData) : p))
     );
     toast.success("Property rejected.");
+  };
+
+  const toggleFeatured = async (id: string) => {
+    const current = properties.find((p) => p.id === id);
+    if (!current) return;
+    const newFeatured = !current.featured;
+    const result = await adminUpdateProperty(id, { featured: newFeatured });
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setProperties((prev) =>
+      prev.map((p) => (p.id === id ? (result.data! as PropertyData) : p))
+    );
+    toast.success(newFeatured ? "Property featured!" : "Featured removed.");
   };
 
   const deleteProperty = async (id: string) => {
@@ -494,6 +511,9 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 text-left font-semibold">
                       Verified
                     </th>
+                    <th className="px-4 py-3 text-left font-semibold">
+                      Featured
+                    </th>
                     <th className="px-4 py-3 text-right font-semibold">
                       Actions
                     </th>
@@ -503,7 +523,7 @@ export default function AdminDashboard() {
                   {properties.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="px-4 py-8 text-center text-sm text-muted-foreground"
                       >
                         No properties found.
@@ -542,6 +562,28 @@ export default function AdminDashboard() {
                           ) : (
                             <BadgeX className="h-5 w-5 text-muted-foreground" />
                           )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => toggleFeatured(p.id)}
+                            className={`gap-1.5 text-xs ${
+                              p.featured
+                                ? "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
+                                : "text-muted-foreground hover:text-amber-600"
+                            }`}
+                          >
+                            {p.featured ? (
+                              <>
+                                <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" /> Featured
+                              </>
+                            ) : (
+                              <>
+                                <StarOff className="h-3.5 w-3.5" /> Feature
+                              </>
+                            )}
+                          </Button>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-2 flex-wrap">

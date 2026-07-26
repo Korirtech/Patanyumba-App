@@ -233,6 +233,7 @@ export interface PropertyData {
   availability: string;
   status: string;
   verified: boolean;
+  featured: boolean;
   views: number;
   inquiries: number;
   whatsappClicks: number;
@@ -248,7 +249,7 @@ export async function adminGetProperties(): Promise<ApiResponse<PropertyData[]>>
 
 export async function adminUpdateProperty(
   id: string,
-  updates: { status?: string; verified?: boolean }
+  updates: { status?: string; verified?: boolean; featured?: boolean }
 ): Promise<ApiResponse<PropertyData>> {
   const result = await apiFetch<{ property: PropertyData }>(`/admin/properties/${id}`, {
     method: "PATCH",

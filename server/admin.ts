@@ -41,6 +41,7 @@ interface PropertyRecord {
   availability: string;
   status: string;
   verified: number;
+  featured: number;
   views: number;
   inquiries: number;
   whatsappClicks: number;
@@ -60,6 +61,7 @@ function normalizeProperty(p: PropertyRecord) {
   return {
     ...p,
     verified: Boolean(p.verified),
+    featured: Boolean(p.featured ?? 0),
   };
 }
 
@@ -154,7 +156,11 @@ router.get("/properties", requireRole("admin"), (_req: Request, res: Response) =
 router.patch("/properties/:id", requireRole("admin"), (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, verified } = req.body as { status?: string; verified?: boolean };
+    const { status, verified, featured } = req.body as {
+      status?: string;
+      verified?: boolean;
+      featured?: boolean;
+    };
 
     const property = propertyQueries.findById(id) as PropertyRecord | undefined;
     if (!property) {
@@ -167,6 +173,9 @@ router.patch("/properties/:id", requireRole("admin"), (req: Request<{ id: string
     }
     if (verified !== undefined) {
       updates.verified = verified ? 1 : 0;
+    }
+    if (featured !== undefined) {
+      updates.featured = featured ? 1 : 0;
     }
 
     if (Object.keys(updates).length === 0) {
