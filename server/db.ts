@@ -1,6 +1,8 @@
+import bcrypt from "bcryptjs";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "node:crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = path.join(__dirname, "..", "data", "patanyumba.db");
@@ -101,6 +103,9 @@ export function initializeDatabase() {
       FOREIGN KEY (userId) REFERENCES users(id)
     )
   `);
+
+  // Seed default admin account if it does not already exist
+  seedAdminUser();
 }
 
 // User queries
@@ -240,3 +245,36 @@ export const propertyQueries = {
     return stmt.run(id);
   },
 };
+// ---------------------------------------------------------------------------
+// Seed default admin user
+// ---------------------------------------------------------------------------
+
+const ADMIN_EMAIL = "patanyumbaadmin@gmail.com";
+const ADMIN_PASSWORD = "Pata123456";
+const ADMIN_NAME = "Patanyumba Admin";
+const ADMIN_PHONE = "0712345678";
+
+async function seedAdminUser() {
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(ADMIN_EMAIL);
+  if (existing) {
+    console.log("✓ Default admin account already exists, skipping seed.");
+    return;
+  }
+
+  const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 12);
+  const stmt = db.prepare(`
+    INSERT INTO users (id, name, email, phone, password, role, status, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  stmt.run(
+    randomUUID(),
+    ADMIN_NAME,
+    ADMIN_EMAIL,
+    ADMIN_PHONE,
+    hashedPassword,
+    "admin",
+    "active",
+    new Date().toISOString()
+  );
+  console.log("✓ Default admin account seeded successfully.");
+}
