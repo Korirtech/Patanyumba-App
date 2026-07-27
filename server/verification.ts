@@ -15,6 +15,7 @@ import { randomInt } from "node:crypto";
 import express, { Request, Response } from "express";
 import { userQueries } from "./db.js";
 import { signToken } from "./jwt.js";
+import { sendVerificationEmail, sendWelcomeEmail } from "./email.js";
 
 // ---------------------------------------------------------------------------
 // In-memory code store (shared via globalThis so auth.ts and this module
@@ -77,9 +78,14 @@ function verifyCode(email: string, inputCode: string): "ok" | "expired" | "inval
 // Simulated email delivery (replace with real provider when ready)
 // ---------------------------------------------------------------------------
 
-function sendVerificationEmail(email: string, code: string): void {
-  // TODO: Replace with nodemailer / Resend / SendGrid call
-  console.log(`[Verification] Code for ${email}: ${code}`);
+async function sendVerificationEmailInternal(email: string, code: string): Promise<void> {
+  // Use the real email service
+  const result = await sendVerificationEmail(email, code);
+  if (!result.success) {
+    console.warn(`Failed to send verification email to ${email}: ${result.error}`);
+    // Still log the code for dev/demo purposes
+    console.log(`[DEV] Verification code for ${email}: ${code}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +122,7 @@ router.post("/send-verification", async (req: Request, res: Response) => {
     }
 
     const code = storeCode(normalizedEmail);
-    sendVerificationEmail(normalizedEmail, code);
+    await sendVerificationEmailInternal(normalizedEmail, code);
 
     // Return the code in the response so the UI can display it (dev/demo mode).
     // In production, remove `code` from the response and rely on the email.
@@ -168,6 +174,9 @@ router.post("/verify-email", async (req: Request, res: Response) => {
     if (!user) {
       return res.status(500).json({ error: "User not found after verification" });
     }
+
+    // Send welcome email
+    await sendWelcomeEmail(user.email, user.name);
 
     const token = signToken({
       userId: user.id,

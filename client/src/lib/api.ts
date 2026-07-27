@@ -225,6 +225,37 @@ export function logoutUser(): void {
 }
 
 // ---------------------------------------------------------------------------
+// File Upload
+// ---------------------------------------------------------------------------
+
+export async function uploadImage(file: File): Promise<ApiResponse<{ imageUrl: string }>> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("image", file);
+
+  try {
+    const response = await fetch(`${API_BASE}/upload`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { error: errorData.error || `Upload failed (${response.status})` };
+    }
+
+    const data = await response.json();
+    return { data };
+  } catch (error) {
+    console.error("Upload API error:", error);
+    return { error: "Network error during upload" };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Email verification
 // ---------------------------------------------------------------------------
 

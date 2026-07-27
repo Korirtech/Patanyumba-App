@@ -2,9 +2,12 @@ import express from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 import { initializeDatabase } from "./db.js";
+import { initializeEmailService } from "./email.js";
 import authRouter from "./auth.js";
 import adminRouter from "./admin.js";
+import uploadRouter from "./upload.js";
 import { apiLimiter, loginLimiter, registerLimiter } from "./rateLimiter.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +22,11 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   initializeDatabase();
   console.log("✓ Database initialized");
+
+  // ---------------------------------------------------------------------------
+  // Email Service
+  // ---------------------------------------------------------------------------
+  initializeEmailService();
 
   // ---------------------------------------------------------------------------
   // Security headers (minimal, no extra dependency required)
@@ -57,6 +65,7 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   app.use("/api/auth", authRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/upload", uploadRouter);
 
   // ---------------------------------------------------------------------------
   // Static file serving (production build)
@@ -67,6 +76,13 @@ async function startServer() {
       : path.resolve(__dirname, "..", "dist", "public");
 
   app.use(express.static(staticPath));
+
+  // Serve property uploads
+  const uploadPath = path.resolve(__dirname, "..", "data", "uploads");
+  if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadPath));
 
   // Handle client-side routing – serve index.html for all non-API routes
   app.get("*", (_req, res) => {
