@@ -6,6 +6,84 @@ import { requireRole, authenticateToken } from "./jwt.js";
 const router = express.Router();
 
 // ---------------------------------------------------------------------------
+// Helper – strip password from user records
+// ---------------------------------------------------------------------------
+
+interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: string;
+  status: string;
+  createdAt: string;
+}
+
+function sanitizeUser(user: UserRecord) {
+  const { password, ...rest } = user;
+  return rest;
+}
+
+// ---------------------------------------------------------------------------
+// Helper – hydrate property with images and amenities from related tables
+// ---------------------------------------------------------------------------
+
+interface PropertyRecord {
+  id: string;
+  landlordId: string;
+  title: string;
+  description: string;
+  county: string;
+  town: string;
+  estate: string;
+  address: string;
+  lat: number;
+  lng: number;
+  type: string;
+  bedrooms: number;
+  bathrooms: number;
+  price: number;
+  deposit: number;
+  availability: string;
+  status: string;
+  verified: number;
+  featured: number;
+  views: number;
+  inquiries: number;
+  whatsappClicks: number;
+  createdAt: string;
+}
+
+function hydrateProperty(p: PropertyRecord) {
+  // Fetch images for this property
+  const images = db
+    .prepare("SELECT imageUrl FROM property_images WHERE propertyId = ? ORDER BY id")
+    .all(p.id) as { imageUrl: string }[];
+
+  // Fetch amenities for this property
+  const amenities = db
+    .prepare("SELECT amenity FROM property_amenities WHERE propertyId = ?")
+    .all(p.id) as { amenity: string }[];
+
+  return {
+    ...p,
+    images: images.map((img) => img.imageUrl),
+    amenities: amenities.map((a) => a.amenity),
+    verified: Boolean(p.verified),
+    featured: Boolean(p.featured ?? 0),
+  };
+}
+
+function normalizeProperty(p: PropertyRecord) {
+  return {
+    ...p,
+    verified: Boolean(p.verified),
+    featured: Boolean(p.featured ?? 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // PUBLIC: GET /api/admin/properties/featured – list featured approved properties
 // (no auth required – used by the public Home page)
 // ---------------------------------------------------------------------------
@@ -14,7 +92,7 @@ router.get("/properties/featured", (_req: Request, res: Response) => {
   try {
     const properties = (propertyQueries.getAll() as PropertyRecord[])
       .filter((p) => p.status === "approved" && Boolean(p.featured) && p.availability !== "Rented")
-      .map(normalizeProperty);
+      .map(hydrateProperty);
     return res.status(200).json({ properties });
   } catch (error) {
     console.error("Get featured properties error:", error);
@@ -31,7 +109,7 @@ router.get("/properties/all", (_req: Request, res: Response) => {
   try {
     const properties = (propertyQueries.getAll() as PropertyRecord[])
       .filter((p) => p.status === "approved")
-      .map(normalizeProperty);
+      .map(hydrateProperty);
     return res.status(200).json({ properties });
   } catch (error) {
     console.error("Get all properties error:", error);
@@ -51,7 +129,7 @@ router.get("/properties/detail/:id", (req: Request<{ id: string }>, res: Respons
     if (!property) {
       return res.status(404).json({ error: "Property not found" });
     }
-    return res.status(200).json({ property: normalizeProperty(property) });
+    return res.status(200).json({ property: hydrateProperty(property) });
   } catch (error) {
     console.error("Get property detail error:", error);
     return res.status(500).json({ error: "Failed to fetch property detail" });
@@ -127,73 +205,16 @@ router.post("/properties", authenticateToken, (req: Request, res: Response) => {
       }
     }
 
-    return res.status(201).json({ property: normalizeProperty(newProperty as any) });
+    const fullProperty = hydrateProperty(newProperty as any);
+    return res.status(201).json({ property: fullProperty });
   } catch (error) {
     console.error("Add property error:", error);
     return res.status(500).json({ error: "Failed to add property" });
   }
 });
 
-// All admin routes require authentication
+// All admin routes below require authentication
 router.use(authenticateToken);
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface UserRecord {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  password: string;
-  role: string;
-  status: string;
-  createdAt: string;
-}
-
-interface PropertyRecord {
-  id: string;
-  landlordId: string;
-  title: string;
-  description: string;
-  county: string;
-  town: string;
-  estate: string;
-  address: string;
-  lat: number;
-  lng: number;
-  type: string;
-  bedrooms: number;
-  bathrooms: number;
-  price: number;
-  deposit: number;
-  availability: string;
-  status: string;
-  verified: number;
-  featured: number;
-  views: number;
-  inquiries: number;
-  whatsappClicks: number;
-  createdAt: string;
-}
-
-// ---------------------------------------------------------------------------
-// Helper – strip password from user records
-// ---------------------------------------------------------------------------
-
-function sanitizeUser(user: UserRecord) {
-  const { password, ...rest } = user;
-  return rest;
-}
-
-function normalizeProperty(p: PropertyRecord) {
-  return {
-    ...p,
-    verified: Boolean(p.verified),
-    featured: Boolean(p.featured ?? 0),
-  };
-}
 
 // ---------------------------------------------------------------------------
 // GET /api/admin/users – list all users (admin only)
@@ -271,7 +292,7 @@ router.delete("/users/:id", requireRole("admin"), (req: Request<{ id: string }>,
 router.get("/properties", requireRole("admin"), (_req: Request, res: Response) => {
   try {
     const properties = propertyQueries.getAll() as PropertyRecord[];
-    const normalized = properties.map(normalizeProperty);
+    const normalized = properties.map(hydrateProperty);
     return res.status(200).json({ properties: normalized });
   } catch (error) {
     console.error("Admin get properties error:", error);
@@ -327,7 +348,7 @@ router.patch("/properties/:id", requireRole("admin"), (req: Request<{ id: string
     propertyQueries.update(id, updates);
 
     const updated = propertyQueries.findById(id) as PropertyRecord | undefined;
-    return res.status(200).json({ property: normalizeProperty(updated!) });
+    return res.status(200).json({ property: hydrateProperty(updated!) });
   } catch (error) {
     console.error("Admin update property error:", error);
     return res.status(500).json({ error: "Failed to update property" });
@@ -357,6 +378,130 @@ router.delete("/properties/:id", requireRole("admin"), (req: Request<{ id: strin
     return res.status(200).json({ message: "Property deleted" });
   } catch (error) {
     console.error("Admin delete property error:", error);
+    return res.status(500).json({ error: "Failed to delete property" });
+  }
+});
+
+// ===========================================================================
+// LANDLORD-SPECIFIC ROUTES
+// These routes allow landlords to manage their own properties
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/properties/landlord – get all properties for the logged-in landlord
+// ---------------------------------------------------------------------------
+
+router.get("/properties/landlord", (req: Request, res: Response) => {
+  try {
+    const landlordId = req.user!.userId;
+    const properties = propertyQueries.getByLandlord(landlordId) as PropertyRecord[];
+    const hydrated = properties.map(hydrateProperty);
+    return res.status(200).json({ properties: hydrated });
+  } catch (error) {
+    console.error("Landlord get properties error:", error);
+    return res.status(500).json({ error: "Failed to fetch landlord properties" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/admin/properties/landlord/:id – update own property
+// (landlord can update status, availability, hide/unhide)
+// ---------------------------------------------------------------------------
+
+router.patch("/properties/landlord/:id", (req: Request<{ id: string }>, res: Response) => {
+  try {
+    const { id } = req.params;
+    const landlordId = req.user!.userId;
+
+    const property = propertyQueries.findById(id) as PropertyRecord | undefined;
+    if (!property) {
+      return res.status(404).json({ error: "Property not found" });
+    }
+
+    // Ensure the landlord owns this property
+    if (property.landlordId !== landlordId) {
+      return res.status(403).json({ error: "You do not own this property" });
+    }
+
+    const { status, availability, title, description, price, deposit, bedrooms, bathrooms } = req.body as {
+      status?: string;
+      availability?: string;
+      title?: string;
+      description?: string;
+      price?: number;
+      deposit?: number;
+      bedrooms?: number;
+      bathrooms?: number;
+    };
+
+    const updates: Record<string, any> = {};
+
+    if (status !== undefined) {
+      const validStatuses = ["pending", "approved", "rejected", "hidden"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      updates.status = status;
+    }
+
+    if (availability !== undefined) {
+      const validAvailability = ["Available", "Rented", "Coming Soon"];
+      if (!validAvailability.includes(availability)) {
+        return res.status(400).json({ error: "Invalid availability value" });
+      }
+      updates.availability = availability;
+    }
+
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (price !== undefined) updates.price = Number(price);
+    if (deposit !== undefined) updates.deposit = Number(deposit);
+    if (bedrooms !== undefined) updates.bedrooms = Number(bedrooms);
+    if (bathrooms !== undefined) updates.bathrooms = Number(bathrooms);
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    propertyQueries.update(id, updates);
+
+    const updated = propertyQueries.findById(id) as PropertyRecord | undefined;
+    return res.status(200).json({ property: hydrateProperty(updated!) });
+  } catch (error) {
+    console.error("Landlord update property error:", error);
+    return res.status(500).json({ error: "Failed to update property" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/admin/properties/landlord/:id – delete own property
+// ---------------------------------------------------------------------------
+
+router.delete("/properties/landlord/:id", (req: Request<{ id: string }>, res: Response) => {
+  try {
+    const { id } = req.params;
+    const landlordId = req.user!.userId;
+
+    const property = propertyQueries.findById(id) as PropertyRecord | undefined;
+    if (!property) {
+      return res.status(404).json({ error: "Property not found" });
+    }
+
+    // Ensure the landlord owns this property
+    if (property.landlordId !== landlordId) {
+      return res.status(403).json({ error: "You do not own this property" });
+    }
+
+    // Clean up related records
+    db.prepare("DELETE FROM property_amenities WHERE propertyId = ?").run(id);
+    db.prepare("DELETE FROM property_images WHERE propertyId = ?").run(id);
+    db.prepare("DELETE FROM favorites WHERE propertyId = ?").run(id);
+    db.prepare("DELETE FROM inquiries WHERE propertyId = ?").run(id);
+
+    propertyQueries.delete(id);
+    return res.status(200).json({ message: "Property deleted" });
+  } catch (error) {
+    console.error("Landlord delete property error:", error);
     return res.status(500).json({ error: "Failed to delete property" });
   }
 });

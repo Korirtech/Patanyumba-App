@@ -350,3 +350,45 @@ export async function adminGetSettings(): Promise<ApiResponse<SettingsData>> {
   if (result.error) return { error: result.error };
   return { data: result.data?.settings };
 }
+
+// ---------------------------------------------------------------------------
+// Landlord API – manage own properties
+// ---------------------------------------------------------------------------
+
+export async function getMyProperties(): Promise<ApiResponse<PropertyData[]>> {
+  const result = await apiFetch<{ properties: PropertyData[] }>("/admin/properties/landlord");
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.properties };
+}
+
+export async function updateMyProperty(
+  id: string,
+  updates: {
+    status?: string;
+    availability?: string;
+    title?: string;
+    description?: string;
+    price?: number;
+    deposit?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+  }
+): Promise<ApiResponse<PropertyData>> {
+  const result = await apiFetch<{ property: PropertyData }>(`/admin/properties/landlord/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+
+  if (result.error) return { error: result.error };
+  return { data: result.data?.property };
+}
+
+export async function deleteMyProperty(id: string): Promise<ApiResponse<{ message: string }>> {
+  const result = await apiFetch<{ message: string }>(`/admin/properties/landlord/${id}`, {
+    method: "DELETE",
+  });
+
+  if (result.error) return { error: result.error };
+  return { data: result.data };
+}

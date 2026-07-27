@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import {
   Home,
@@ -11,18 +11,24 @@ import {
   Clock,
   XCircle,
   EyeOff,
+  Loader2,
 } from "lucide-react";
 import DashboardLayout, { navIcons } from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import {
-  getPropertiesByLandlord,
-  saveProperties,
-  getProperties,
+  getMyProperties,
+  updateMyProperty,
+  deleteMyProperty,
   formatCurrency,
   formatDate,
   getSettings,
 } from "@/lib/store";
+import {
+  getMyProperties as getMyPropertiesApi,
+  deleteMyProperty as deleteMyPropertyApi,
+  updateMyProperty as updateMyPropertyApi,
+} from "@/lib/api";
 import type { Property } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -52,9 +58,32 @@ export default function LandlordDashboard() {
   const [location] = useLocation();
   const settings = getSettings();
 
-  const [myProperties, setMyProperties] = useState<Property[]>(
-    user ? getPropertiesByLandlord(user.id) : []
-  );
+  const [myProperties, setMyProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Fetch properties from the backend API
+  const fetchProperties = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await getMyPropertiesApi();
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      setMyProperties(result.data || []);
+    } catch (err) {
+      toast.error("Failed to load properties.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchProperties();
+    }
+  }, [user, refreshKey, fetchProperties]);
 
   const stats = useMemo(() => ({
     total: myProperties.length,
@@ -63,21 +92,28 @@ export default function LandlordDashboard() {
     totalWhatsApp: myProperties.reduce((sum, p) => sum + (p.whatsappClicks || 0), 0),
   }), [myProperties]);
 
-  const deleteProperty = (id: string) => {
-    const all = getProperties().filter((p) => p.id !== id);
-    saveProperties(all);
+  const deleteProperty = async (id: string) => {
+    const result = await deleteMyPropertyApi(id);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
     setMyProperties((prev) => prev.filter((p) => p.id !== id));
     toast.success("Property deleted.");
   };
 
-  const toggleHide = (id: string) => {
-    const all = getProperties().map((p) => {
-      if (p.id !== id) return p;
-      const newStatus = p.status === "hidden" ? "approved" : "hidden";
-      return { ...p, status: newStatus as Property["status"] };
-    });
-    saveProperties(all);
-    setMyProperties(user ? getPropertiesByLandlord(user.id) : []);
+  const toggleHide = async (id: string) => {
+    const property = myProperties.find((p) => p.id === id);
+    if (!property) return;
+    const newStatus = property.status === "hidden" ? "approved" : "hidden";
+    const result = await updateMyPropertyApi(id, { status: newStatus });
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setMyProperties((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status: newStatus as Property["status"] } : p))
+    );
     toast.success("Property visibility updated.");
   };
 
@@ -119,7 +155,11 @@ export default function LandlordDashboard() {
                 <Button variant="ghost" size="sm">View All</Button>
               </Link>
             </div>
-            {myProperties.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : myProperties.length === 0 ? (
               <div className="px-6 py-12 text-center">
                 <Home className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
                 <p className="text-muted-foreground text-sm">You haven't listed any properties yet.</p>
@@ -172,7 +212,11 @@ export default function LandlordDashboard() {
               </Button>
             </Link>
           </div>
-          {myProperties.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : myProperties.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-12 text-center">
               <Home className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
               <p className="text-muted-foreground">You haven't listed any properties yet.</p>

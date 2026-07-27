@@ -226,7 +226,7 @@ export default function AddProperty() {
     toast.success(
       "Property added! It will be reviewed by admin before going live."
     );
-    navigate("/landlord/dashboard");
+    navigate("/landlord/properties");
   };
 
   const errors = validate(form);

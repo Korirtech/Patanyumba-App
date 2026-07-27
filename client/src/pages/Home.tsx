@@ -218,7 +218,7 @@ export default function Home() {
                   amenities: [],
                   availability: p.availability as any,
                   status: p.status as any,
-                  images: [],
+                  images: p.images || [],
                   views: p.views,
                   inquiries: p.inquiries,
                   whatsappClicks: p.whatsappClicks,
