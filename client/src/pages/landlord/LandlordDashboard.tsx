@@ -13,6 +13,7 @@ import {
   XCircle,
   EyeOff,
   Loader2,
+  Edit,
 } from "lucide-react";
 import DashboardLayout, { navIcons } from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
@@ -273,6 +274,11 @@ export default function LandlordDashboard() {
                             <Link href={`/property/${p.id}`}>
                               <Button size="sm" variant="outline" className="gap-1.5 text-xs">
                                 <Eye className="h-3.5 w-3.5" /> View
+                              </Button>
+                            </Link>
+                            <Link href={`/landlord/properties/${p.id}/edit`}>
+                              <Button size="sm" variant="outline" className="gap-1.5 text-xs">
+                                <Edit className="h-3.5 w-3.5" /> Edit
                               </Button>
                             </Link>
                             {p.status === "approved" && (

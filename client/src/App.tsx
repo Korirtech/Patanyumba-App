@@ -28,6 +28,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 // Landlord pages
 import LandlordDashboard from "./pages/landlord/LandlordDashboard";
 import AddProperty from "./pages/landlord/AddProperty";
+import EditProperty from "./pages/landlord/EditProperty";
 
 // Client pages
 import ClientDashboard from "./pages/client/ClientDashboard";
@@ -125,6 +126,11 @@ function Router() {
       <Route path="/landlord/properties">
         <ProtectedRoute roles={["landlord"]}>
           <LandlordDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/landlord/properties/:id/edit">
+        <ProtectedRoute roles={["landlord"]}>
+          <EditProperty />
         </ProtectedRoute>
       </Route>
 

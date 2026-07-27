@@ -497,6 +497,13 @@ export async function updateMyProperty(
     deposit?: number;
     bedrooms?: number;
     bathrooms?: number;
+    county?: string;
+    town?: string;
+    estate?: string;
+    address?: string;
+    type?: string;
+    amenities?: string[];
+    images?: string[];
   }
 ): Promise<ApiResponse<PropertyData>> {
   const result = await apiFetch<{ property: PropertyData }>(`/admin/properties/landlord/${id}`, {

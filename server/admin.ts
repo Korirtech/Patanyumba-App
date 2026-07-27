@@ -423,7 +423,23 @@ router.patch("/properties/landlord/:id", (req: Request<{ id: string }>, res: Res
       return res.status(403).json({ error: "You do not own this property" });
     }
 
-    const { status, availability, title, description, price, deposit, bedrooms, bathrooms } = req.body as {
+    const {
+      status,
+      availability,
+      title,
+      description,
+      price,
+      deposit,
+      bedrooms,
+      bathrooms,
+      county,
+      town,
+      estate,
+      address,
+      type,
+      amenities,
+      images,
+    } = req.body as {
       status?: string;
       availability?: string;
       title?: string;
@@ -432,6 +448,13 @@ router.patch("/properties/landlord/:id", (req: Request<{ id: string }>, res: Res
       deposit?: number;
       bedrooms?: number;
       bathrooms?: number;
+      county?: string;
+      town?: string;
+      estate?: string;
+      address?: string;
+      type?: string;
+      amenities?: string[];
+      images?: string[];
     };
 
     const updates: Record<string, any> = {};
@@ -458,12 +481,37 @@ router.patch("/properties/landlord/:id", (req: Request<{ id: string }>, res: Res
     if (deposit !== undefined) updates.deposit = Number(deposit);
     if (bedrooms !== undefined) updates.bedrooms = Number(bedrooms);
     if (bathrooms !== undefined) updates.bathrooms = Number(bathrooms);
+    if (county !== undefined) updates.county = county;
+    if (town !== undefined) updates.town = town;
+    if (estate !== undefined) updates.estate = estate;
+    if (address !== undefined) updates.address = address;
+    if (type !== undefined) updates.type = type;
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && !amenities && !images) {
       return res.status(400).json({ error: "No valid fields to update" });
     }
 
-    propertyQueries.update(id, updates);
+    if (Object.keys(updates).length > 0) {
+      propertyQueries.update(id, updates);
+    }
+
+    // Update amenities if provided
+    if (Array.isArray(amenities)) {
+      db.prepare("DELETE FROM property_amenities WHERE propertyId = ?").run(id);
+      const stmt = db.prepare("INSERT INTO property_amenities (propertyId, amenity) VALUES (?, ?)");
+      for (const amenity of amenities) {
+        stmt.run(id, amenity);
+      }
+    }
+
+    // Update images if provided
+    if (Array.isArray(images)) {
+      db.prepare("DELETE FROM property_images WHERE propertyId = ?").run(id);
+      const stmt = db.prepare("INSERT INTO property_images (propertyId, imageUrl) VALUES (?, ?)");
+      for (const imageUrl of images) {
+        stmt.run(id, imageUrl);
+      }
+    }
 
     const updated = propertyQueries.findById(id) as PropertyRecord | undefined;
     return res.status(200).json({ property: hydrateProperty(updated!) });
