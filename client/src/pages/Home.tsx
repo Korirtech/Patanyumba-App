@@ -215,7 +215,7 @@ export default function Home() {
                   bathrooms: p.bathrooms,
                   price: p.price,
                   deposit: p.deposit,
-                  amenities: [],
+                  amenities: p.amenities || [],
                   availability: p.availability as any,
                   status: p.status as any,
                   images: p.images || [],

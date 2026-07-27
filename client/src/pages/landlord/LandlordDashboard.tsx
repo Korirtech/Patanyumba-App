@@ -17,9 +17,6 @@ import DashboardLayout, { navIcons } from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import {
-  getMyProperties,
-  updateMyProperty,
-  deleteMyProperty,
   formatCurrency,
   formatDate,
   getSettings,

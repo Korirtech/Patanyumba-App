@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { Heart, Home, MessageCircle } from "lucide-react";
+import { Heart, Home, MessageCircle, Loader2 } from "lucide-react";
 import DashboardLayout, { navIcons } from "@/components/DashboardLayout";
 import PropertyCard from "@/components/PropertyCard";
 import { Button } from "@/components/ui/button";
-import { getUserFavorites, getProperties } from "@/lib/store";
+import { getUserFavorites } from "@/lib/store";
+import { getAllProperties } from "@/lib/api";
+import type { PropertyData } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
@@ -15,10 +17,24 @@ const navItems = [
 export default function ClientDashboard() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const allProperties = getProperties();
+  const [properties, setProperties] = useState<PropertyData[]>([]);
+  const [loading, setLoading] = useState(true);
   const favorites = useMemo(() => getUserFavorites(user?.id || ""), [user?.id]);
 
   const activeTab = location === "/client/favorites" ? "favorites" : "overview";
+
+  // Fetch properties from the backend API
+  useEffect(() => {
+    const fetchProperties = async () => {
+      setLoading(true);
+      const result = await getAllProperties();
+      if (!result.error) {
+        setProperties(result.data || []);
+      }
+      setLoading(false);
+    };
+    fetchProperties();
+  }, []);
 
   return (
     <DashboardLayout navItems={navItems} title="Client Dashboard" activePath={location}>
@@ -38,7 +54,7 @@ export default function ClientDashboard() {
                   <Home className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold tabular-nums">{allProperties.length}</p>
+                  <p className="text-2xl font-bold tabular-nums">{properties.length}</p>
                   <p className="text-xs text-muted-foreground">Total Listings</p>
                 </div>
               </div>
@@ -70,9 +86,13 @@ export default function ClientDashboard() {
           {/* Browse Properties */}
           <div>
             <h3 className="font-display font-semibold mb-4">Browse Properties</h3>
-            {allProperties.length > 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : properties.length > 0 ? (
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {allProperties.map((p) => (
+                {properties.map((p) => (
                   <PropertyCard key={p.id} property={p} />
                 ))}
               </div>
