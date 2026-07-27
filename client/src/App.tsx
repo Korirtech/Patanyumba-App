@@ -18,6 +18,7 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import VerifyEmail from "./pages/VerifyEmail";
 import DashboardRedirect from "./pages/DashboardRedirect";
 
 // Admin pages
@@ -73,6 +74,11 @@ function Router() {
       <Route path="/register">
         <PublicLayout>
           <Register />
+        </PublicLayout>
+      </Route>
+      <Route path="/verify-email">
+        <PublicLayout>
+          <VerifyEmail />
         </PublicLayout>
       </Route>
 

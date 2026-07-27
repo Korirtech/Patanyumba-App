@@ -3,6 +3,7 @@ import express, { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { userQueries } from "./db.js";
 import { signToken, authenticateToken } from "./jwt.js";
+import verificationRouter from "./verification.js";
 
 type UserRole = "admin" | "landlord" | "client";
 
@@ -39,6 +40,7 @@ interface UserRecord {
   password: string;
   role: string;
   status: string;
+  emailVerified: number;
   createdAt: string;
 }
 
@@ -54,6 +56,7 @@ function sanitizeUser(user: UserRecord) {
     phone: user.phone,
     role: user.role,
     status: user.status,
+    emailVerified: Boolean(user.emailVerified),
     createdAt: user.createdAt,
   };
 }
@@ -98,7 +101,7 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
     // --- Hash password with bcrypt ---
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // --- Persist user ---
+    // --- Persist user (unverified) ---
     const newUser = {
       id: randomUUID(),
       name: name.trim(),
@@ -107,12 +110,30 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
       password: hashedPassword,
       role,
       status: "active",
+      emailVerified: 0,
       createdAt: new Date().toISOString(),
     };
 
     userQueries.create(newUser);
 
-    // --- Issue JWT ---
+    // --- Generate and (simulate) send verification code ---
+    // Import the code generator inline to avoid circular deps
+    const { randomInt } = await import("node:crypto");
+    const verificationCode = String(randomInt(100_000, 999_999));
+
+    // Store the code in the in-memory map via the verification module
+    // We re-export a helper for this so the router doesn't need to know internals
+    (globalThis as any).__pendingVerificationCodes = (globalThis as any).__pendingVerificationCodes || new Map();
+    (globalThis as any).__pendingVerificationCodes.set(newUser.email, {
+      code: verificationCode,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+      attempts: 0,
+    });
+
+    console.log(`[Verification] New user ${newUser.email} – code: ${verificationCode}`);
+
+    // --- Issue a short-lived token scoped only for verification ---
+    // The full JWT (with dashboard access) is issued after email verification.
     const token = signToken({
       userId: newUser.id,
       email: newUser.email,
@@ -122,6 +143,9 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
     return res.status(201).json({
       token,
       user: sanitizeUser(newUser as UserRecord),
+      // ⚠️  devCode: remove once real email delivery is configured
+      devCode: verificationCode,
+      requiresVerification: true,
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -164,6 +188,15 @@ router.post("/login", async (req: Request<{}, {}, LoginRequest>, res: Response) 
     // --- Account status check ---
     if (user.status === "suspended") {
       return res.status(403).json({ error: "Account has been suspended" });
+    }
+
+    // --- Email verification check ---
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        error: "Please verify your email before logging in.",
+        requiresVerification: true,
+        email: user.email,
+      });
     }
 
     // --- Issue JWT ---
@@ -231,5 +264,8 @@ router.get("/user/:id", authenticateToken, (req: Request<{ id: string }>, res: R
     return res.status(500).json({ error: "Failed to get user" });
   }
 });
+
+// Mount verification sub-routes
+router.use("/", verificationRouter);
 
 export default router;

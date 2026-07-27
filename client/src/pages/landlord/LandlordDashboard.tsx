@@ -68,7 +68,7 @@ export default function LandlordDashboard() {
         toast.error(result.error);
         return;
       }
-      setMyProperties(result.data || []);
+      setMyProperties((result.data || []) as unknown as Property[]);
     } catch (err) {
       toast.error("Failed to load properties.");
     } finally {
@@ -229,6 +229,7 @@ export default function LandlordDashboard() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/40">
+                      <th className="px-4 py-3 text-left font-semibold w-16">Photo</th>
                       <th className="px-4 py-3 text-left font-semibold">Property</th>
                       <th className="px-4 py-3 text-left font-semibold">Location</th>
                       <th className="px-4 py-3 text-left font-semibold">Price</th>
@@ -241,6 +242,16 @@ export default function LandlordDashboard() {
                   <tbody className="divide-y divide-border">
                     {myProperties.map((p) => (
                       <tr key={p.id} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3">
+                          <img
+                            src={p.images?.[0] || "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=80&h=60&fit=crop"}
+                            alt={p.title}
+                            className="h-12 w-16 rounded-lg object-cover bg-muted shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=80&h=60&fit=crop";
+                            }}
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <p className="font-medium truncate max-w-[180px]">{p.title}</p>
                           <p className="text-xs text-muted-foreground">{p.type} · {p.bedrooms}bd/{p.bathrooms}ba</p>

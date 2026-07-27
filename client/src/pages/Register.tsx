@@ -37,7 +37,8 @@ export default function Register() {
     });
     setLoading(false);
     if (success) {
-      navigate("/dashboard");
+      // Always redirect to verify-email; the context handles the verification flow
+      navigate("/verify-email");
     }
   };
 

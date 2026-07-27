@@ -10,15 +10,23 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, pendingEmail } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
     if (isLoading) return; // wait for session restoration to finish
+
+    // If there's a pending verification, redirect to the verify page
+    if (!isAuthenticated && pendingEmail) {
+      navigate("/verify-email");
+      return;
+    }
+
     if (!isAuthenticated) {
       navigate("/login");
       return;
     }
+
     if (roles && user && !roles.includes(user.role)) {
       // Redirect to their own dashboard
       const path =
@@ -29,7 +37,7 @@ export default function ProtectedRoute({ children, roles }: ProtectedRouteProps)
             : "/client/dashboard";
       navigate(path);
     }
-  }, [isAuthenticated, user, roles, navigate, isLoading]);
+  }, [isAuthenticated, user, roles, navigate, isLoading, pendingEmail]);
 
   // Show loading spinner while session is being restored
   if (isLoading) {

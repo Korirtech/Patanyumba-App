@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Mail, Lock, LogIn } from "lucide-react";
+import { Mail, Lock, LogIn, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,21 +8,30 @@ import { useAuth } from "@/contexts/AuthContext";
 import BrandMark from "@/components/BrandMark";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, pendingEmail } = useAuth();
   const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setUnverifiedEmail(null);
+
     const success = await login(email.trim(), password.trim());
     setLoading(false);
+
     if (success) {
-      // Redirect based on role will be handled by the auth context
-      // We navigate to a generic dashboard route that redirects
       navigate("/dashboard");
+    } else {
+      // If the context set a pendingEmail it means verification is required
+      // We surface a local banner here too for clarity
+      const stored = localStorage.getItem("pata_pending_email");
+      if (stored) {
+        setUnverifiedEmail(stored);
+      }
     }
   };
 
@@ -37,6 +46,30 @@ export default function Login() {
               Login to your PataNyumba account
             </p>
           </div>
+
+          {/* Unverified email banner */}
+          {(unverifiedEmail || pendingEmail) && (
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="flex-1 text-sm">
+                <p className="font-semibold text-amber-800 dark:text-amber-300">
+                  Email not verified
+                </p>
+                <p className="mt-0.5 text-amber-700 dark:text-amber-400">
+                  Please verify your email address before logging in.
+                </p>
+                <Link href="/verify-email">
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="mt-1 h-auto p-0 text-amber-700 underline dark:text-amber-400"
+                  >
+                    Go to verification page →
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">

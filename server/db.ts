@@ -25,6 +25,7 @@ export function initializeDatabase() {
       password TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'client',
       status TEXT NOT NULL DEFAULT 'active',
+      emailVerified INTEGER NOT NULL DEFAULT 0,
       createdAt TEXT NOT NULL
     )
   `);
@@ -112,6 +113,16 @@ export function initializeDatabase() {
     console.log("✓ Migrated: added `featured` column to properties table.");
   }
 
+  // Migrate – add `emailVerified` column to users if it does not exist
+  const userCols = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!userCols.find((c) => c.name === "emailVerified")) {
+    db.exec("ALTER TABLE users ADD COLUMN emailVerified INTEGER NOT NULL DEFAULT 0");
+    console.log("✓ Migrated: added `emailVerified` column to users table.");
+    // Mark existing admin accounts as verified so they keep working
+    db.exec("UPDATE users SET emailVerified = 1 WHERE role = 'admin'");
+    console.log("✓ Marked existing admin accounts as email-verified.");
+  }
+
   // Seed default admin account if it does not already exist
   seedAdminUser();
 }
@@ -126,11 +137,12 @@ export const userQueries = {
     password: string;
     role: string;
     status: string;
+    emailVerified?: number;
     createdAt: string;
   }) => {
     const stmt = db.prepare(`
-      INSERT INTO users (id, name, email, phone, password, role, status, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, name, email, phone, password, role, status, emailVerified, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     return stmt.run(
       user.id,
@@ -140,6 +152,7 @@ export const userQueries = {
       user.password,
       user.role,
       user.status,
+      user.emailVerified ?? 0,
       user.createdAt
     );
   },
@@ -159,11 +172,12 @@ export const userQueries = {
     return stmt.all();
   },
 
-  update: (id: string, data: Record<string, any>) => {
+  update: (id: string, data: Record<string, any>, by: "id" | "email" = "id") => {
     const keys = Object.keys(data);
     const values = Object.values(data);
     const setClause = keys.map((k) => `${k} = ?`).join(", ");
-    const stmt = db.prepare(`UPDATE users SET ${setClause} WHERE id = ?`);
+    const whereCol = by === "email" ? "email" : "id";
+    const stmt = db.prepare(`UPDATE users SET ${setClause} WHERE ${whereCol} = ?`);
     return stmt.run(...values, id);
   },
 
@@ -271,8 +285,8 @@ async function seedAdminUser() {
 
   const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 12);
   const stmt = db.prepare(`
-    INSERT INTO users (id, name, email, phone, password, role, status, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (id, name, email, phone, password, role, status, emailVerified, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run(
     randomUUID(),
@@ -282,6 +296,7 @@ async function seedAdminUser() {
     hashedPassword,
     "admin",
     "active",
+    1, // admin is pre-verified
     new Date().toISOString()
   );
   console.log("✓ Default admin account seeded successfully.");

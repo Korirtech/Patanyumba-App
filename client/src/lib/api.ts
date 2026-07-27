@@ -43,6 +43,7 @@ export interface UserData {
   phone: string;
   role: string;
   status: string;
+  emailVerified: boolean;
   createdAt: string;
 }
 
@@ -100,6 +101,17 @@ interface AuthResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Registration response – may include a verification code (dev/demo mode)
+// ---------------------------------------------------------------------------
+
+export interface RegisterResponse {
+  user: UserData;
+  requiresVerification: boolean;
+  /** Dev/demo only – the 6-digit code that would be emailed in production */
+  devCode?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Register a new user
 // ---------------------------------------------------------------------------
 
@@ -109,43 +121,77 @@ export async function registerUser(data: {
   phone: string;
   password: string;
   role: string;
-}): Promise<ApiResponse<UserData>> {
-  const result = await apiFetch<AuthResponse>("/auth/register", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+}): Promise<ApiResponse<RegisterResponse>> {
+  const result = await apiFetch<AuthResponse & { requiresVerification?: boolean; devCode?: string }>(
+    "/auth/register",
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    }
+  );
 
   if (result.error) return { error: result.error };
 
-  // Persist the token so subsequent requests are authenticated
+  // Persist the token so subsequent requests (like resend) are authenticated
   if (result.data?.token) {
     setToken(result.data.token);
   }
 
-  return { data: result.data?.user };
+  return {
+    data: {
+      user: result.data!.user,
+      requiresVerification: result.data?.requiresVerification ?? false,
+      devCode: result.data?.devCode,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Login with email and password
 // ---------------------------------------------------------------------------
 
+export interface LoginErrorData {
+  requiresVerification?: boolean;
+  email?: string;
+}
+
 export async function loginUser(
   email: string,
   password: string
-): Promise<ApiResponse<UserData>> {
-  const result = await apiFetch<AuthResponse>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
+): Promise<ApiResponse<UserData> & { meta?: LoginErrorData }> {
+  // Use a raw fetch here so we can inspect the body on 403
+  const token = getToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  if (result.error) return { error: result.error };
+  try {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ email, password }),
+    });
 
-  // Persist the token
-  if (result.data?.token) {
-    setToken(result.data.token);
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        error: body.error || `Request failed (${response.status})`,
+        meta: {
+          requiresVerification: body.requiresVerification,
+          email: body.email,
+        },
+      };
+    }
+
+    if (body.token) {
+      setToken(body.token);
+    }
+
+    return { data: body.user };
+  } catch (error) {
+    console.error("API error [/auth/login]:", error);
+    return { error: "Network error. Please check your connection." };
   }
-
-  return { data: result.data?.user };
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +223,53 @@ export async function getUser(id: string): Promise<ApiResponse<UserData>> {
 export function logoutUser(): void {
   clearToken();
 }
+
+// ---------------------------------------------------------------------------
+// Email verification
+// ---------------------------------------------------------------------------
+
+export interface VerifyEmailResponse {
+  user: UserData;
+  message: string;
+}
+
+export async function verifyEmailCode(
+  email: string,
+  code: string
+): Promise<ApiResponse<VerifyEmailResponse>> {
+  const result = await apiFetch<{ token: string; user: UserData; message: string }>(
+    "/auth/verify-email",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }
+  );
+
+  if (result.error) return { error: result.error };
+
+  // Upgrade the stored token to the full post-verification JWT
+  if (result.data?.token) {
+    setToken(result.data.token);
+  }
+
+  return { data: { user: result.data!.user, message: result.data!.message } };
+}
+
+export async function resendVerificationCode(
+  email: string
+): Promise<ApiResponse<{ devCode?: string; message: string }>> {
+  const result = await apiFetch<{ devCode?: string; message: string }>(
+    "/auth/send-verification",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }
+  );
+
+  if (result.error) return { error: result.error };
+  return { data: result.data };
+}
+
 // ---------------------------------------------------------------------------
 // Admin API – users
 // ---------------------------------------------------------------------------
