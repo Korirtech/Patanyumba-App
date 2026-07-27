@@ -26,7 +26,7 @@ PataNyumba provides three user roles with dedicated dashboards and permissions.
 - Approve or reject submitted properties
 - Verify property listings
 - Delete inappropriate listings
-- Feature/unfeature properties
+- **Feature/unfeature properties** for prominent display on the Home page
 - Mark properties as:
   - Available
   - Rented
@@ -37,7 +37,7 @@ PataNyumba provides three user roles with dedicated dashboards and permissions.
 ### 🏘️ Landlord
 
 - Register an account
-- Submit new property listings
+- **Submit new property listings directly to the server**
 - View approval status
 - Hide or unhide listings
 - Delete owned listings
@@ -53,7 +53,7 @@ PataNyumba provides three user roles with dedicated dashboards and permissions.
 
 ---
 
-# 🎨 Modern User Interface
+## 🎨 Modern User Interface
 
 Built with modern web technologies to provide a fast, responsive, and accessible experience.
 
@@ -69,90 +69,41 @@ Features include:
 
 ---
 
-# ✨ Recent Updates & Technical Improvements
+## ✨ Recent Updates & Technical Improvements
 
-## Unified Property Storage
+### Unified Property Storage
 
-Property data is now stored persistently in a **SQLite database** through the **Express.js backend**, replacing the previous LocalStorage-only implementation.
+Property data is now stored persistently in a **SQLite database** through the **Express.js backend**, replacing the previous LocalStorage-only implementation for properties. This ensures:
 
-Benefits include:
-
-- Persistent storage
+- Persistent storage across sessions
 - Better data integrity
 - Cross-device consistency
-- Reliable synchronization
+- Reliable synchronization between Landlord, Admin, and Public pages
+
+### New Public API Endpoints
+
+Public pages now retrieve data directly from the backend API, ensuring users always receive the latest information.
+
+**Available Endpoints:**
+- `GET /api/admin/properties/all` — Powers the Properties page
+- `GET /api/admin/properties/detail/:id` — Powers the Property Detail page
+- `GET /api/admin/properties/featured` — Powers the Home page featured section
+
+### Enhanced Landlord Workflow
+
+Landlords now submit properties directly to the backend. Submissions follow a clear lifecycle:
+1. **Submission** by Landlord
+2. **Pending Review** status
+3. **Admin Approval** or Rejection
+4. **Public Listing** (if approved)
+
+### Advanced Admin Property Management
+
+Administrators have comprehensive control over the property lifecycle, including reviewing pending listings, featuring properties, and managing availability statuses with automatic synchronization (e.g., auto-unfeaturing rented properties).
 
 ---
 
-## New Public API Endpoints
-
-Public pages now retrieve data directly from the backend.
-
-### Available Endpoints
-
-```
-GET /api/admin/properties/all
-GET /api/admin/properties/detail/:id
-GET /api/admin/properties/featured
-```
-
-These endpoints power:
-
-- Home Page
-- Properties Page
-- Property Detail Page
-
-ensuring users always receive the latest information.
-
----
-
-## Enhanced Landlord Workflow
-
-Landlords now submit properties directly to the backend.
-
-Submission process:
-
-```
-Landlord
-      ↓
-Pending Review
-      ↓
-Admin Approval
-      ↓
-Public Listing
-```
-
-Only approved properties become publicly visible.
-
----
-
-## Advanced Admin Property Management
-
-Administrators can now:
-
-- View all submitted properties
-- Review pending listings
-- Approve or reject submissions
-- Feature or unfeature listings
-- Update availability status
-- Mark listings as rented
-- Automatically remove rented properties from Featured Listings
-
----
-
-## Client-Side Improvements
-
-The following pages now fetch data dynamically from the backend API:
-
-- Home
-- Properties
-- Property Detail
-
-Client-side filtering, searching, and sorting remain fully functional.
-
----
-
-# 🛠️ Tech Stack
+## 🛠️ Tech Stack
 
 | Category | Technology |
 |----------|------------|
@@ -169,81 +120,69 @@ Client-side filtering, searching, and sorting remain fully functional.
 
 ---
 
-# 🚀 Getting Started
+## 🚀 Getting Started
 
-## Prerequisites
+### Prerequisites
 
 - Node.js **v18+**
 - pnpm **v10.4.1+**
 
----
+### Installation
 
-## Installation
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd Patanyumba-App
+   ```
 
-### Clone the repository
+2. **Install dependencies:**
+   ```bash
+   pnpm install
+   ```
 
-```bash
-git clone <repository-url>
-cd Patanyumba-App
-```
+3. **Start the development server:**
+   ```bash
+   pnpm dev
+   ```
 
-### Install dependencies
-
-```bash
-pnpm install
-```
-
-### Start the development server
-
-```bash
-pnpm dev
-```
-
-Open your browser and visit:
-
-**https://patanyumba-staging.onrender.com/**
+Open your browser and visit: `http://localhost:3000`
 
 ---
 
-# 📂 Project Structure
+## 📂 Project Structure
 
 ```text
 patanyumba_project/
-├── client/
+├── client/               # React frontend source code
 │   ├── src/
-│   │   ├── components/
-│   │   ├── contexts/
-│   │   ├── hooks/
-│   │   ├── lib/
-│   │   └── pages/
-│
-├── server/
-│
-├── shared/
-│
-├── public/
-│
-└── dist/
+│   │   ├── components/   # Reusable UI components
+│   │   ├── contexts/     # React Context providers (Auth, Theme, Favorites)
+│   │   ├── hooks/        # Custom React hooks
+│   │   ├── lib/          # Utilities, types, and store (mock data)
+│   │   └── pages/        # Page components for routing
+├── server/               # Express.js backend for API and data persistence
+├── shared/               # Shared constants and types
+├── public/               # Static assets
+└── dist/                 # Production build output
 ```
 
 ---
 
-# 🔐 Admin Credentials
+## 🔐 Admin Credentials
 
 The application includes an account for Admin logins.
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | pakanyumbaadmin@gmail.com | Paka123456 |
+| Admin | `pakanyumbaadmin@gmail.com` | `Paka123456` |
 
 > **Note**
->
 > - User sessions and preferences are stored in **LocalStorage**.
 > - Property listings are stored persistently in the **SQLite database** via the Express backend.
 
 ---
 
-# 📦 Available Scripts
+## 📦 Available Scripts
 
 | Command | Description |
 |----------|-------------|
@@ -256,50 +195,27 @@ The application includes an account for Admin logins.
 
 ---
 
-# 🎯 Project Vision
+## 🎯 Project Vision
 
-PataNyumba aims to simplify the house-hunting experience in Kenya by providing a centralized, secure, and user-friendly platform where:
-
-- Property seekers can easily discover rental homes.
-- Landlords can efficiently market and manage their properties.
-- Administrators can maintain platform quality through moderation and verification.
-
-The long-term vision is to become Kenya's most trusted digital property marketplace, offering reliable listings, seamless communication, and innovative property management tools.
+PataNyumba aims to simplify the house-hunting experience in Kenya by providing a centralized, secure, and user-friendly platform. The long-term vision is to become Kenya's most trusted digital property marketplace, offering reliable listings, seamless communication, and innovative property management tools.
 
 ---
 
-# 🤝 Contributing
+## 🤝 Contributing
 
 Contributions are welcome!
 
 1. Fork the repository
-2. Create a feature branch
-
-```bash
-git checkout -b feature/my-feature
-```
-
-3. Commit your changes
-
-```bash
-git commit -m "Add amazing feature"
-```
-
-4. Push to GitHub
-
-```bash
-git push origin feature/my-feature
-```
-
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes (`git commit -m "Add amazing feature"`)
+4. Push to GitHub (`git push origin feature/my-feature`)
 5. Open a Pull Request
 
 ---
 
-# 📄 License
+## 📄 License
 
-This project is licensed under the **MIT License**.
-
-See the **LICENSE** file for more information.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
