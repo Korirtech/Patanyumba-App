@@ -1,13 +1,13 @@
 import { Link } from "wouter";
 import { Heart, Bed, Bath, MapPin, BadgeCheck, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { formatCurrency, getSettings } from "@/lib/store";
 import type { Property, PropertyStatus } from "@/lib/types";
 import type { PropertyData } from "@/lib/api";
+import SafeImage from "@/components/SafeImage";
 
 const statusStyles: Record<PropertyStatus, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
@@ -28,7 +28,7 @@ export default function PropertyCard({ property }: { property: Property | Proper
   const { isFavorite, toggleFavorite } = useFavorites();
   const settings = getSettings();
   const fav = user ? isFavorite(property.id) : false;
-  const img = property.images?.[0] || "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop";
+  const img = property.images?.[0] || "";
 
   const whatsappLink = `https://wa.me/254726605919?text=${encodeURIComponent(
     `Hello, I'm interested in your property listed on PataNyumba.\nProperty: ${property.title}\nLocation: ${property.county} ${property.town}\nPrice: ${formatCurrency(property.price, settings.currency)}\nCan I schedule a viewing?`
@@ -38,15 +38,12 @@ export default function PropertyCard({ property }: { property: Property | Proper
     <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
       {/* Image */}
       <div className="relative aspect-[16/10] overflow-hidden bg-muted">
-        <img
+        <SafeImage
           src={img}
           alt={property.title}
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-400 group-hover:scale-105"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src =
-              "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop";
-          }}
+          wrapperClassName="h-full w-full"
         />
         <div className="absolute left-3 top-3 flex gap-2">
           <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", statusStyles[property.status as PropertyStatus])}>

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLocation, Link } from "wouter";
+import SafeImage from "@/components/SafeImage";
 import {
   Home,
   Eye,
@@ -169,14 +170,14 @@ export default function LandlordDashboard() {
             ) : (
               <div className="divide-y divide-border">
                 {myProperties.slice(0, 5).map((p) => {
-                  const img = p.images?.[0] || "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=80&h=60&fit=crop";
+                  const img = p.images?.[0] || "";
                   return (
                     <div key={p.id} className="flex items-center gap-4 px-6 py-4">
-                      <img
+                      <SafeImage
                         src={img}
                         alt={p.title}
-                        className="h-14 w-20 rounded-lg object-cover shrink-0 bg-muted"
-                        onError={(e) => ((e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=80&h=60&fit=crop")}
+                        className="h-14 w-20 rounded-lg object-cover shrink-0"
+                        wrapperClassName="h-14 w-20 shrink-0 rounded-lg overflow-hidden bg-muted"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{p.title}</p>
@@ -243,13 +244,11 @@ export default function LandlordDashboard() {
                     {myProperties.map((p) => (
                       <tr key={p.id} className="hover:bg-muted/20 transition-colors">
                         <td className="px-4 py-3">
-                          <img
-                            src={p.images?.[0] || "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=80&h=60&fit=crop"}
+                          <SafeImage
+                            src={p.images?.[0]}
                             alt={p.title}
-                            className="h-12 w-16 rounded-lg object-cover bg-muted shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=80&h=60&fit=crop";
-                            }}
+                            className="h-12 w-16 rounded-lg object-cover shrink-0"
+                            wrapperClassName="h-12 w-16 shrink-0 rounded-lg overflow-hidden bg-muted"
                           />
                         </td>
                         <td className="px-4 py-3">

@@ -1,6 +1,6 @@
 import { useState, useId, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { PlusCircle, ImagePlus, Save, AlertCircle, X, Loader2, Upload } from "lucide-react";
+import { PlusCircle, Save, AlertCircle } from "lucide-react";
 import DashboardLayout, { navIcons } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,11 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
-import { addProperty, uploadImage } from "@/lib/api";
+import { addProperty } from "@/lib/api";
 import type { Availability } from "@/lib/types";
 import { PROPERTY_TYPES, KENYAN_COUNTIES, AMENITY_OPTIONS } from "@/lib/types";
 import { toast } from "sonner";
+import ImageUploader from "@/components/ImageUploader";
 
 const navItems = [
   { href: "/landlord/dashboard", label: "Overview", icon: navIcons.dashboard },
@@ -76,21 +77,7 @@ interface AddPropertyFormState {
   images: string[];
 }
 
-// ── Accessible description helper component ───────────────────────────
-function FieldDescription({
-  id,
-  children,
-}: {
-  id: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <p id={id} className="text-sm text-muted-foreground">
-      {children}
-    </p>
-  );
-}
-
+// ── Accessible description helper components ──────────────────────────
 function FieldError({
   id,
   message,
@@ -116,23 +103,12 @@ export default function AddProperty() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const formId = useId();
   const titleErrorId = `${formId}-title-error`;
-  const titleDescId = `${formId}-title-desc`;
   const townErrorId = `${formId}-town-error`;
-  const townDescId = `${formId}-town-desc`;
   const priceErrorId = `${formId}-price-error`;
-  const priceDescId = `${formId}-price-desc`;
   const descriptionErrorId = `${formId}-description-error`;
-  const descriptionDescId = `${formId}-description-desc`;
-  const imagesErrorId = `${formId}-images-error`;
-  const imagesDescId = `${formId}-images-desc`;
   const formErrorId = `${formId}-form-error`;
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const firstErrorRef = useRef<HTMLDivElement>(null);
-  const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState<AddPropertyFormState>({
     title: "",
@@ -150,50 +126,6 @@ export default function AddProperty() {
     amenities: [] as string[],
     images: [] as string[],
   });
-  const [imageUrl, setImageUrl] = useState("");
-
-  useEffect(() => {
-    if (submitted) {
-      setSubmitted(false);
-    }
-  }, [form]);
-
-  const addImageUrl = () => {
-    if (!imageUrl.trim()) return;
-    setForm({ ...form, images: [...form.images, imageUrl.trim()] });
-    setImageUrl("");
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Basic size check (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5MB");
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const result = await uploadImage(file);
-      if (result.error) {
-        toast.error(result.error);
-      } else if (result.data?.imageUrl) {
-        setForm(prev => ({ ...prev, images: [...prev.images, result.data!.imageUrl] }));
-        toast.success("Image uploaded successfully");
-      }
-    } catch (err) {
-      toast.error("Failed to upload image");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const removeImage = (idx: number) => {
-    setForm({ ...form, images: form.images.filter((_, i) => i !== idx) });
-  };
 
   const toggleAmenity = (a: string) => {
     setForm({
@@ -211,11 +143,9 @@ export default function AddProperty() {
     const errors = validate(form);
 
     if (Object.keys(errors).length > 0) {
-      toast.error("Please fix the errors before submitting");
+      toast.error("Please fix the errors before submitting.");
       const errorBanner = document.getElementById(formErrorId);
-      if (errorBanner) {
-        errorBanner.focus();
-      }
+      if (errorBanner) errorBanner.focus();
       return;
     }
 
@@ -246,12 +176,6 @@ export default function AddProperty() {
   };
 
   const errors = validate(form);
-
-  const titleDescribedBy = [titleDescId, titleErrorId].join(" ").trim();
-  const townDescribedBy = [townDescId, townErrorId].join(" ").trim();
-  const priceDescribedBy = [priceDescId, priceErrorId].join(" ").trim();
-  const descriptionDescribedBy = [descriptionDescId, descriptionErrorId].join(" ").trim();
-  const imagesDescribedBy = [imagesDescId, imagesErrorId].join(" ").trim();
 
   return (
     <DashboardLayout
@@ -284,6 +208,8 @@ export default function AddProperty() {
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="e.g. Modern 2BR Apartment in Kilimani"
+              aria-describedby={errors.title ? titleErrorId : undefined}
+              aria-invalid={!!errors.title}
             />
             <FieldError id={titleErrorId} message={errors.title} />
           </div>
@@ -295,11 +221,14 @@ export default function AddProperty() {
               rows={4}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Describe your property..."
+              placeholder="Describe your property — location highlights, nearby amenities, unique features…"
+              aria-describedby={errors.description ? descriptionErrorId : undefined}
+              aria-invalid={!!errors.description}
             />
+            <FieldError id={descriptionErrorId} message={errors.description} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="county">County *</Label>
               <Select value={form.county} onValueChange={(v) => setForm({ ...form, county: v })}>
@@ -319,8 +248,31 @@ export default function AddProperty() {
                 value={form.town}
                 onChange={(e) => setForm({ ...form, town: e.target.value })}
                 placeholder="e.g. Kilimani"
+                aria-describedby={errors.town ? townErrorId : undefined}
+                aria-invalid={!!errors.town}
               />
               <FieldError id={townErrorId} message={errors.town} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="estate">Estate / Neighbourhood</Label>
+              <Input
+                id="estate"
+                value={form.estate}
+                onChange={(e) => setForm({ ...form, estate: e.target.value })}
+                placeholder="e.g. Lavington"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Street Address</Label>
+              <Input
+                id="address"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                placeholder="e.g. 14 Ngong Road"
+              />
             </div>
           </div>
         </div>
@@ -362,15 +314,19 @@ export default function AddProperty() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="price" className={errors.price ? "text-destructive" : ""}>Price (KSh/month) *</Label>
+              <Label htmlFor="price" className={errors.price ? "text-destructive" : ""}>
+                Price (KSh/month) *
+              </Label>
               <Input
                 id="price"
                 type="number"
                 min="0"
                 value={form.price}
                 onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })}
+                aria-describedby={errors.price ? priceErrorId : undefined}
+                aria-invalid={!!errors.price}
               />
               <FieldError id={priceErrorId} message={errors.price} />
             </div>
@@ -382,79 +338,63 @@ export default function AddProperty() {
                 min="0"
                 value={form.deposit}
                 onChange={(e) => setForm({ ...form, deposit: parseFloat(e.target.value) || 0 })}
-                placeholder="Auto (2x rent)"
+                placeholder="Auto (2× rent)"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="availability">Availability</Label>
+            <Select
+              value={form.availability}
+              onValueChange={(v) => setForm({ ...form, availability: v as Availability })}
+            >
+              <SelectTrigger id="availability"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Available">Available</SelectItem>
+                <SelectItem value="Occupied">Occupied</SelectItem>
+                <SelectItem value="Coming Soon">Coming Soon</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {/* Images */}
+        {/* Amenities */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-lg font-bold">Images</h3>
-            <div className="flex gap-2">
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleFileUpload}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
+          <h3 className="font-display text-lg font-bold">Amenities</h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {AMENITY_OPTIONS.map((amenity) => (
+              <label
+                key={amenity}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 text-sm transition-colors hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
               >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Upload Image
-              </Button>
-            </div>
+                <Checkbox
+                  checked={form.amenities.includes(amenity)}
+                  onCheckedChange={() => toggleAmenity(amenity)}
+                />
+                {amenity}
+              </label>
+            ))}
           </div>
+        </div>
 
-          <div className="flex gap-2">
-            <Input
-              type="url"
-              placeholder="Or paste an image URL..."
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addImageUrl())}
-            />
-            <Button type="button" variant="secondary" onClick={addImageUrl}>Add URL</Button>
-          </div>
-
-          {form.images.length > 0 && (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-              {form.images.map((img, idx) => (
-                <div key={idx} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted">
-                  <img
-                    src={img.startsWith("/") ? img : img}
-                    alt={`Property ${idx + 1}`}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=200&h=200&fit=crop";
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Images – enhanced uploader */}
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+          <h3 className="font-display text-lg font-bold">Property Images</h3>
+          <p className="text-sm text-muted-foreground">
+            Upload high-quality photos of your property. The first image will be used as the cover photo on listings.
+          </p>
+          <ImageUploader
+            images={form.images}
+            onChange={(imgs) => setForm((prev) => ({ ...prev, images: imgs }))}
+          />
         </div>
 
         {/* Submit */}
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button type="submit" size="lg" disabled={loading} className="gap-2">
             <Save className="h-4 w-4" />
-            {loading ? "Submitting..." : "Submit Property"}
+            {loading ? "Submitting…" : "Submit Property"}
           </Button>
           <Link href="/landlord/dashboard">
             <Button type="button" variant="outline" size="lg">Cancel</Button>
