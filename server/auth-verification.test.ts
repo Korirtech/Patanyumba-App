@@ -17,24 +17,35 @@ const users = new Map<string, TestUser>();
 
 vi.mock("./db.js", () => ({
   userQueries: {
-    create: (user: TestUser) => {
+    create: async (user: TestUser) => {
       users.set(user.email, { ...user });
-      return { changes: 1 };
+      return [{ id: user.id }];
     },
-    findByEmail: (email: string) => users.get(email),
-    findById: (id: string) => [...users.values()].find((user) => user.id === id),
-    getAll: () => [...users.values()],
-    update: (id: string, data: Record<string, unknown>, by: "id" | "email" = "id") => {
+    findByEmail: async (email: string) => users.get(email),
+    findById: async (id: string) => [...users.values()].find((user) => user.id === id),
+    getAll: async () => [...users.values()],
+    update: async (id: string, data: Record<string, unknown>, by: "id" | "email" = "id") => {
       const user = by === "email" ? users.get(id) : [...users.values()].find((item) => item.id === id);
-      if (!user) return { changes: 0 };
+      if (!user) return [];
       Object.assign(user, data);
-      return { changes: 1 };
+      return [user];
     },
-    delete: (id: string) => {
+    delete: async (id: string) => {
       const user = [...users.values()].find((item) => item.id === id);
-      if (!user) return { changes: 0 };
+      if (!user) return [];
       users.delete(user.email);
-      return { changes: 1 };
+      return [user];
+    },
+  },
+  initializeDatabase: async () => {},
+  db: {
+    insert: vi.fn(),
+    select: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    query: {
+      propertyImages: { findMany: vi.fn() },
+      propertyAmenities: { findMany: vi.fn() },
     },
   },
 }));

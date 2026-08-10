@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import express, { Request, Response } from "express";
 import { userQueries, propertyQueries, db } from "./db.js";
+import * as schema from "./schema.js";
+import { eq, inArray } from "drizzle-orm";
 import { requireRole, authenticateToken } from "./jwt.js";
 
 const router = express.Router();
@@ -55,16 +57,17 @@ interface PropertyRecord {
   createdAt: string;
 }
 
-function hydrateProperty(p: PropertyRecord) {
+async function hydrateProperty(p: PropertyRecord) {
   // Fetch images for this property
-  const images = db
-    .prepare("SELECT imageUrl FROM property_images WHERE propertyId = ? ORDER BY id")
-    .all(p.id) as { imageUrl: string }[];
+  const images = await db.query.propertyImages.findMany({
+    where: eq(schema.propertyImages.propertyId, p.id),
+    orderBy: [schema.propertyImages.id],
+  });
 
   // Fetch amenities for this property
-  const amenities = db
-    .prepare("SELECT amenity FROM property_amenities WHERE propertyId = ?")
-    .all(p.id) as { amenity: string }[];
+  const amenities = await db.query.propertyAmenities.findMany({
+    where: eq(schema.propertyAmenities.propertyId, p.id),
+  });
 
   return {
     ...p,
@@ -88,11 +91,14 @@ function normalizeProperty(p: PropertyRecord) {
 // (no auth required – used by the public Home page)
 // ---------------------------------------------------------------------------
 
-router.get("/properties/featured", (_req: Request, res: Response) => {
+router.get("/properties/featured", async (_req: Request, res: Response) => {
   try {
-    const properties = (propertyQueries.getAll() as PropertyRecord[])
-      .filter((p) => p.status === "approved" && Boolean(p.featured) && p.availability !== "Rented")
-      .map(hydrateProperty);
+    const allProperties = (await propertyQueries.getAll()) as PropertyRecord[];
+    const properties = await Promise.all(
+      allProperties
+        .filter((p) => p.status === "approved" && Boolean(p.featured) && p.availability !== "Rented")
+        .map(hydrateProperty)
+    );
     return res.status(200).json({ properties });
   } catch (error) {
     console.error("Get featured properties error:", error);
@@ -105,11 +111,14 @@ router.get("/properties/featured", (_req: Request, res: Response) => {
 // (no auth required – used by the public Properties page)
 // ---------------------------------------------------------------------------
 
-router.get("/properties/all", (_req: Request, res: Response) => {
+router.get("/properties/all", async (_req: Request, res: Response) => {
   try {
-    const properties = (propertyQueries.getAll() as PropertyRecord[])
-      .filter((p) => p.status === "approved")
-      .map(hydrateProperty);
+    const allProperties = (await propertyQueries.getAll()) as PropertyRecord[];
+    const properties = await Promise.all(
+      allProperties
+        .filter((p) => p.status === "approved")
+        .map(hydrateProperty)
+    );
     return res.status(200).json({ properties });
   } catch (error) {
     console.error("Get all properties error:", error);
@@ -122,14 +131,14 @@ router.get("/properties/all", (_req: Request, res: Response) => {
 // (no auth required – used by the public Property Detail page)
 // ---------------------------------------------------------------------------
 
-router.get("/properties/detail/:id", (req: Request<{ id: string }>, res: Response) => {
+router.get("/properties/detail/:id", async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
-    const property = propertyQueries.findById(id) as PropertyRecord | undefined;
+    const property = (await propertyQueries.findById(id)) as PropertyRecord | undefined;
     if (!property) {
       return res.status(404).json({ error: "Property not found" });
     }
-    return res.status(200).json({ property: hydrateProperty(property) });
+    return res.status(200).json({ property: await hydrateProperty(property) });
   } catch (error) {
     console.error("Get property detail error:", error);
     return res.status(500).json({ error: "Failed to fetch property detail" });
@@ -141,7 +150,7 @@ router.get("/properties/detail/:id", (req: Request<{ id: string }>, res: Respons
 // (requires auth)
 // ---------------------------------------------------------------------------
 
-router.post("/properties", authenticateToken, (req: Request, res: Response) => {
+router.post("/properties", authenticateToken, async (req: Request, res: Response) => {
   try {
     const {
       title,
@@ -187,25 +196,29 @@ router.post("/properties", authenticateToken, (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
     };
 
-    propertyQueries.create(newProperty);
+    await propertyQueries.create(newProperty);
 
     // Save amenities
     if (Array.isArray(amenities)) {
-      const stmt = db.prepare("INSERT INTO property_amenities (propertyId, amenity) VALUES (?, ?)");
       for (const amenity of amenities) {
-        stmt.run(newProperty.id, amenity);
+        await db.insert(schema.propertyAmenities).values({
+          propertyId: newProperty.id,
+          amenity,
+        });
       }
     }
 
     // Save images
     if (Array.isArray(images)) {
-      const stmt = db.prepare("INSERT INTO property_images (propertyId, imageUrl) VALUES (?, ?)");
       for (const imageUrl of images) {
-        stmt.run(newProperty.id, imageUrl);
+        await db.insert(schema.propertyImages).values({
+          propertyId: newProperty.id,
+          imageUrl,
+        });
       }
     }
 
-    const fullProperty = hydrateProperty(newProperty as any);
+    const fullProperty = await hydrateProperty(newProperty as any);
     return res.status(201).json({ property: fullProperty });
   } catch (error) {
     console.error("Add property error:", error);
@@ -220,9 +233,9 @@ router.use(authenticateToken);
 // GET /api/admin/users – list all users (admin only)
 // ---------------------------------------------------------------------------
 
-router.get("/users", requireRole("admin"), (_req: Request, res: Response) => {
+router.get("/users", requireRole("admin"), async (_req: Request, res: Response) => {
   try {
-    const users = userQueries.getAll() as UserRecord[];
+    const users = (await userQueries.getAll()) as UserRecord[];
     const sanitized = users.map(sanitizeUser);
     return res.status(200).json({ users: sanitized });
   } catch (error) {
@@ -235,7 +248,7 @@ router.get("/users", requireRole("admin"), (_req: Request, res: Response) => {
 // PATCH /api/admin/users/:id – toggle user status (admin only)
 // ---------------------------------------------------------------------------
 
-router.patch("/users/:id", requireRole("admin"), (req: Request<{ id: string }>, res: Response) => {
+router.patch("/users/:id", requireRole("admin"), async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body as { status?: string };
@@ -244,14 +257,14 @@ router.patch("/users/:id", requireRole("admin"), (req: Request<{ id: string }>, 
       return res.status(400).json({ error: "Invalid status. Must be 'active' or 'suspended'." });
     }
 
-    const user = userQueries.findById(id) as UserRecord | undefined;
+    const user = (await userQueries.findById(id)) as UserRecord | undefined;
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    userQueries.update(id, { status });
+    await userQueries.update(id, { status });
 
-    const updated = userQueries.findById(id) as UserRecord | undefined;
+    const updated = (await userQueries.findById(id)) as UserRecord | undefined;
     return res.status(200).json({ user: sanitizeUser(updated!) });
   } catch (error) {
     console.error("Admin update user error:", error);
@@ -263,7 +276,7 @@ router.patch("/users/:id", requireRole("admin"), (req: Request<{ id: string }>, 
 // DELETE /api/admin/users/:id – delete a user (admin only)
 // ---------------------------------------------------------------------------
 
-router.delete("/users/:id", requireRole("admin"), (req: Request<{ id: string }>, res: Response) => {
+router.delete("/users/:id", requireRole("admin"), async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -272,12 +285,12 @@ router.delete("/users/:id", requireRole("admin"), (req: Request<{ id: string }>,
       return res.status(400).json({ error: "Cannot delete your own account" });
     }
 
-    const user = userQueries.findById(id) as UserRecord | undefined;
+    const user = (await userQueries.findById(id)) as UserRecord | undefined;
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    userQueries.delete(id);
+    await userQueries.delete(id);
     return res.status(200).json({ message: "User deleted" });
   } catch (error) {
     console.error("Admin delete user error:", error);
@@ -289,10 +302,10 @@ router.delete("/users/:id", requireRole("admin"), (req: Request<{ id: string }>,
 // GET /api/admin/properties – list all properties (admin only)
 // ---------------------------------------------------------------------------
 
-router.get("/properties", requireRole("admin"), (_req: Request, res: Response) => {
+router.get("/properties", requireRole("admin"), async (_req: Request, res: Response) => {
   try {
-    const properties = propertyQueries.getAll() as PropertyRecord[];
-    const normalized = properties.map(hydrateProperty);
+    const allProperties = (await propertyQueries.getAll()) as PropertyRecord[];
+    const normalized = await Promise.all(allProperties.map(hydrateProperty));
     return res.status(200).json({ properties: normalized });
   } catch (error) {
     console.error("Admin get properties error:", error);
@@ -304,7 +317,7 @@ router.get("/properties", requireRole("admin"), (_req: Request, res: Response) =
 // PATCH /api/admin/properties/:id – update property status/verified (admin only)
 // ---------------------------------------------------------------------------
 
-router.patch("/properties/:id", requireRole("admin"), (req: Request<{ id: string }>, res: Response) => {
+router.patch("/properties/:id", requireRole("admin"), async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
     const { status, verified, featured, availability } = req.body as {
@@ -314,7 +327,7 @@ router.patch("/properties/:id", requireRole("admin"), (req: Request<{ id: string
       availability?: string;
     };
 
-    const property = propertyQueries.findById(id) as PropertyRecord | undefined;
+    const property = (await propertyQueries.findById(id)) as PropertyRecord | undefined;
     if (!property) {
       return res.status(404).json({ error: "Property not found" });
     }
@@ -345,10 +358,10 @@ router.patch("/properties/:id", requireRole("admin"), (req: Request<{ id: string
       return res.status(400).json({ error: "No valid fields to update" });
     }
 
-    propertyQueries.update(id, updates);
+    await propertyQueries.update(id, updates);
 
-    const updated = propertyQueries.findById(id) as PropertyRecord | undefined;
-    return res.status(200).json({ property: hydrateProperty(updated!) });
+    const updated = (await propertyQueries.findById(id)) as PropertyRecord | undefined;
+    return res.status(200).json({ property: await hydrateProperty(updated!) });
   } catch (error) {
     console.error("Admin update property error:", error);
     return res.status(500).json({ error: "Failed to update property" });
@@ -391,11 +404,11 @@ router.delete("/properties/:id", requireRole("admin"), (req: Request<{ id: strin
 // GET /api/admin/properties/landlord – get all properties for the logged-in landlord
 // ---------------------------------------------------------------------------
 
-router.get("/properties/landlord", (req: Request, res: Response) => {
+router.get("/properties/landlord", async (req: Request, res: Response) => {
   try {
     const landlordId = req.user!.userId;
-    const properties = propertyQueries.getByLandlord(landlordId) as PropertyRecord[];
-    const hydrated = properties.map(hydrateProperty);
+    const properties = (await propertyQueries.getByLandlord(landlordId)) as PropertyRecord[];
+    const hydrated = await Promise.all(properties.map(hydrateProperty));
     return res.status(200).json({ properties: hydrated });
   } catch (error) {
     console.error("Landlord get properties error:", error);
@@ -408,12 +421,12 @@ router.get("/properties/landlord", (req: Request, res: Response) => {
 // (landlord can update status, availability, hide/unhide)
 // ---------------------------------------------------------------------------
 
-router.patch("/properties/landlord/:id", (req: Request<{ id: string }>, res: Response) => {
+router.patch("/properties/landlord/:id", async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
     const landlordId = req.user!.userId;
 
-    const property = propertyQueries.findById(id) as PropertyRecord | undefined;
+    const property = (await propertyQueries.findById(id)) as PropertyRecord | undefined;
     if (!property) {
       return res.status(404).json({ error: "Property not found" });
     }
@@ -492,29 +505,33 @@ router.patch("/properties/landlord/:id", (req: Request<{ id: string }>, res: Res
     }
 
     if (Object.keys(updates).length > 0) {
-      propertyQueries.update(id, updates);
+      await propertyQueries.update(id, updates);
     }
 
     // Update amenities if provided
     if (Array.isArray(amenities)) {
-      db.prepare("DELETE FROM property_amenities WHERE propertyId = ?").run(id);
-      const stmt = db.prepare("INSERT INTO property_amenities (propertyId, amenity) VALUES (?, ?)");
+      await db.delete(schema.propertyAmenities).where(eq(schema.propertyAmenities.propertyId, id));
       for (const amenity of amenities) {
-        stmt.run(id, amenity);
+        await db.insert(schema.propertyAmenities).values({
+          propertyId: id,
+          amenity,
+        });
       }
     }
 
     // Update images if provided
     if (Array.isArray(images)) {
-      db.prepare("DELETE FROM property_images WHERE propertyId = ?").run(id);
-      const stmt = db.prepare("INSERT INTO property_images (propertyId, imageUrl) VALUES (?, ?)");
+      await db.delete(schema.propertyImages).where(eq(schema.propertyImages.propertyId, id));
       for (const imageUrl of images) {
-        stmt.run(id, imageUrl);
+        await db.insert(schema.propertyImages).values({
+          propertyId: id,
+          imageUrl,
+        });
       }
     }
 
-    const updated = propertyQueries.findById(id) as PropertyRecord | undefined;
-    return res.status(200).json({ property: hydrateProperty(updated!) });
+    const updated = (await propertyQueries.findById(id)) as PropertyRecord | undefined;
+    return res.status(200).json({ property: await hydrateProperty(updated!) });
   } catch (error) {
     console.error("Landlord update property error:", error);
     return res.status(500).json({ error: "Failed to update property" });
@@ -525,12 +542,12 @@ router.patch("/properties/landlord/:id", (req: Request<{ id: string }>, res: Res
 // DELETE /api/admin/properties/landlord/:id – delete own property
 // ---------------------------------------------------------------------------
 
-router.delete("/properties/landlord/:id", (req: Request<{ id: string }>, res: Response) => {
+router.delete("/properties/landlord/:id", async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
     const landlordId = req.user!.userId;
 
-    const property = propertyQueries.findById(id) as PropertyRecord | undefined;
+    const property = (await propertyQueries.findById(id)) as PropertyRecord | undefined;
     if (!property) {
       return res.status(404).json({ error: "Property not found" });
     }
@@ -541,12 +558,12 @@ router.delete("/properties/landlord/:id", (req: Request<{ id: string }>, res: Re
     }
 
     // Clean up related records
-    db.prepare("DELETE FROM property_amenities WHERE propertyId = ?").run(id);
-    db.prepare("DELETE FROM property_images WHERE propertyId = ?").run(id);
-    db.prepare("DELETE FROM favorites WHERE propertyId = ?").run(id);
-    db.prepare("DELETE FROM inquiries WHERE propertyId = ?").run(id);
+    await db.delete(schema.propertyAmenities).where(eq(schema.propertyAmenities.propertyId, id));
+    await db.delete(schema.propertyImages).where(eq(schema.propertyImages.propertyId, id));
+    await db.delete(schema.favorites).where(eq(schema.favorites.propertyId, id));
+    await db.delete(schema.inquiries).where(eq(schema.inquiries.propertyId, id));
 
-    propertyQueries.delete(id);
+    await propertyQueries.delete(id);
     return res.status(200).json({ message: "Property deleted" });
   } catch (error) {
     console.error("Landlord delete property error:", error);

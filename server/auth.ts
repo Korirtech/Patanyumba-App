@@ -91,9 +91,9 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
     }
 
     // --- Duplicate check ---
-    const existingUser = userQueries.findByEmail(email.toLowerCase().trim()) as
-      | UserRecord
-      | undefined;
+    const existingUser = (await userQueries.findByEmail(
+      email.toLowerCase().trim()
+    )) as UserRecord | undefined;
     if (existingUser) {
       return res.status(409).json({ error: "Email already registered" });
     }
@@ -114,7 +114,7 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
       createdAt: new Date().toISOString(),
     };
 
-    userQueries.create(newUser);
+    await userQueries.create(newUser);
 
     // --- Generate, store, and send the verification code ---
     const delivery = await createAndSendVerificationCode(newUser.email);
@@ -123,7 +123,7 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
     // email service is unavailable. In development, the API returns devCode so
     // the flow can still be tested without SMTP credentials.
     if (!delivery.sent && process.env.NODE_ENV === "production") {
-      userQueries.delete(newUser.id);
+      await userQueries.delete(newUser.id);
       return res.status(503).json({
         error: "Registration is temporarily unavailable because the verification email could not be sent. Please try again later.",
       });
@@ -163,9 +163,9 @@ router.post("/login", async (req: Request<{}, {}, LoginRequest>, res: Response) 
     }
 
     // --- Lookup user ---
-    const user = userQueries.findByEmail(email.toLowerCase().trim()) as
-      | UserRecord
-      | undefined;
+    const user = (await userQueries.findByEmail(
+      email.toLowerCase().trim()
+    )) as UserRecord | undefined;
 
     // Use a constant-time comparison path even when user is not found to
     // prevent timing-based user enumeration attacks.
@@ -216,9 +216,11 @@ router.post("/login", async (req: Request<{}, {}, LoginRequest>, res: Response) 
 // GET /api/auth/me  – verify token and return current user (protected)
 // ---------------------------------------------------------------------------
 
-router.get("/me", authenticateToken, (req: Request, res: Response) => {
+router.get("/me", authenticateToken, async (req: Request, res: Response) => {
   try {
-    const user = userQueries.findById(req.user!.userId) as UserRecord | undefined;
+    const user = (await userQueries.findById(req.user!.userId)) as
+      | UserRecord
+      | undefined;
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -239,7 +241,7 @@ router.get("/me", authenticateToken, (req: Request, res: Response) => {
 // GET /api/auth/user/:id  – get user by ID (protected)
 // ---------------------------------------------------------------------------
 
-router.get("/user/:id", authenticateToken, (req: Request<{ id: string }>, res: Response) => {
+router.get("/user/:id", authenticateToken, async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -248,7 +250,7 @@ router.get("/user/:id", authenticateToken, (req: Request<{ id: string }>, res: R
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const user = userQueries.findById(id) as UserRecord | undefined;
+    const user = (await userQueries.findById(id)) as UserRecord | undefined;
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });

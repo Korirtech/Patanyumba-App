@@ -128,7 +128,7 @@ router.post("/send-verification", async (req: Request, res: Response) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const user = userQueries.findByEmail(normalizedEmail) as
+    const user = (await userQueries.findByEmail(normalizedEmail)) as
       | { id: string; emailVerified: number; status: string }
       | undefined;
 
@@ -190,11 +190,19 @@ router.post("/verify-email", async (req: Request, res: Response) => {
     }
 
     // Mark user as verified in the database
-    userQueries.update(normalizedEmail, { emailVerified: 1 }, "email");
+    await userQueries.update(normalizedEmail, { emailVerified: 1 }, "email");
 
     // Fetch the updated user and issue a full JWT
-    const user = userQueries.findByEmail(normalizedEmail) as
-      | { id: string; name: string; email: string; phone: string; role: string; status: string; createdAt: string }
+    const user = (await userQueries.findByEmail(normalizedEmail)) as
+      | {
+          id: string;
+          name: string;
+          email: string;
+          phone: string;
+          role: string;
+          status: string;
+          createdAt: string;
+        }
       | undefined;
 
     if (!user) {

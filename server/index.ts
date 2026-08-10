@@ -20,7 +20,7 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   // Database
   // ---------------------------------------------------------------------------
-  initializeDatabase();
+  await initializeDatabase();
   console.log("✓ Database initialized");
 
   // ---------------------------------------------------------------------------
@@ -77,12 +77,7 @@ async function startServer() {
 
   app.use(express.static(staticPath));
 
-  // Serve property uploads
-  const uploadPath = path.resolve(__dirname, "..", "data", "uploads");
-  if (!fs.existsSync(uploadPath)) {
-    fs.mkdirSync(uploadPath, { recursive: true });
-  }
-  app.use("/uploads", express.static(uploadPath));
+  // Local uploads are now handled by Supabase Storage
 
   // Handle client-side routing – serve index.html for all non-API routes
   app.get("*", (_req, res) => {

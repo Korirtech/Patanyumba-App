@@ -73,7 +73,7 @@ Features include:
 
 ### Unified Property Storage
 
-Property data is now stored persistently in a **SQLite database** through the **Express.js backend**, replacing the previous LocalStorage-only implementation for properties. This ensures:
+Property data is now stored persistently in a **PostgreSQL database (Supabase)** through the **Express.js backend** and **Drizzle ORM**, replacing the previous SQLite implementation. This ensures:
 
 - Persistent storage across sessions
 - Better data integrity
@@ -109,14 +109,14 @@ Administrators have comprehensive control over the property lifecycle, including
 |----------|------------|
 | Frontend | React 19, TypeScript, Vite |
 | Backend | Express.js |
-| Database | SQLite |
+| Database | PostgreSQL (Supabase) |
 | Styling | Tailwind CSS, shadcn/ui |
 | Animations | Framer Motion |
 | State Management | React Context API |
 | Forms | React Hook Form, Zod |
 | Routing | Wouter |
 | Icons | Lucide React |
-| Storage | SQLite (properties), LocalStorage (user sessions & settings) |
+| Storage | Supabase Storage (images), PostgreSQL (properties), LocalStorage (user sessions & settings) |
 
 ---
 
@@ -147,12 +147,22 @@ Administrators have comprehensive control over the property lifecycle, including
 
 Open your browser and visit: `http://localhost:3000`
 
-### Email verification configuration
+### Supabase & Email Configuration
 
-Registration creates an **unverified** account, generates a six-digit code, and sends it through SMTP. Configure the following environment variables before testing email verification:
+The application uses **Supabase** for the database and file storage, and **SMTP** for email verification. Configure the following environment variables:
 
 ```env
+# App URL
 APP_URL=https://your-deployed-domain.example
+
+# Supabase Configuration
+DATABASE_URL=postgres://postgres:[password]@[host]:5432/postgres
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_BUCKET=properties
+
+# SMTP Configuration
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-sender@example.com
@@ -193,7 +203,7 @@ The application includes an account for Admin logins.
 
 > **Note**
 > - User sessions and preferences are stored in **LocalStorage**.
-> - Property listings are stored persistently in the **SQLite database** via the Express backend.
+> - Property listings are stored persistently in the **Supabase PostgreSQL database** via the Express backend.
 
 ---
 
