@@ -10,7 +10,9 @@
     "preview": "vite preview --host",
     "check": "tsc --noEmit",
     "test:server": "vitest run --config vitest.server.config.ts",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "db:push": "drizzle-kit push",
+    "db:migrate-sqlite": "tsx scripts/migrate-to-supabase.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
