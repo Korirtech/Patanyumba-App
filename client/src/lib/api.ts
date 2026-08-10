@@ -100,6 +100,13 @@ interface AuthResponse {
   user: UserData;
 }
 
+interface RegisterHttpResponse {
+  token?: string;
+  user: UserData;
+  requiresVerification?: boolean;
+  devCode?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Registration response – may include a verification code (dev/demo mode)
 // ---------------------------------------------------------------------------
@@ -122,7 +129,7 @@ export async function registerUser(data: {
   password: string;
   role: string;
 }): Promise<ApiResponse<RegisterResponse>> {
-  const result = await apiFetch<AuthResponse & { requiresVerification?: boolean; devCode?: string }>(
+  const result = await apiFetch<RegisterHttpResponse>(
     "/auth/register",
     {
       method: "POST",
@@ -132,8 +139,11 @@ export async function registerUser(data: {
 
   if (result.error) return { error: result.error };
 
-  // Persist the token so subsequent requests (like resend) are authenticated
-  if (result.data?.token) {
+  // Registration now returns an unverified account. Do not retain an access
+  // token until the verification endpoint issues the full session token.
+  if (result.data?.requiresVerification) {
+    clearToken();
+  } else if (result.data?.token) {
     setToken(result.data.token);
   }
 

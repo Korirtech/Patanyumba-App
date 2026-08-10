@@ -4,11 +4,10 @@
  * Implements a 6-digit OTP-based email verification flow.
  * Codes are stored in-memory with a 15-minute TTL.
  *
- * Architecture note: The `sendVerificationEmail` function currently logs the
- * code to the console and returns it in the API response so the front-end can
- * display it (useful for development / demo). To add real email delivery, swap
- * `sendVerificationEmail` with a nodemailer / Resend / SendGrid call — no other
- * changes are needed.
+ * Codes are sent through the configured email service. When SMTP is not
+ * configured in development, the code is returned to the caller so local
+ * testing remains possible; production registration treats delivery failure as
+ * an error.
  */
 
 import { randomInt } from "node:crypto";
@@ -75,17 +74,37 @@ function verifyCode(email: string, inputCode: string): "ok" | "expired" | "inval
 }
 
 // ---------------------------------------------------------------------------
-// Simulated email delivery (replace with real provider when ready)
+// Code generation and email delivery
 // ---------------------------------------------------------------------------
 
-async function sendVerificationEmailInternal(email: string, code: string): Promise<void> {
-  // Use the real email service
-  const result = await sendVerificationEmail(email, code);
+export interface VerificationDeliveryResult {
+  code: string;
+  sent: boolean;
+  error?: string;
+}
+
+/**
+ * Generate, store, and deliver one verification code. Keeping this operation
+ * here ensures registration and resend always use the same in-memory store.
+ */
+export async function createAndSendVerificationCode(
+  email: string
+): Promise<VerificationDeliveryResult> {
+  const normalizedEmail = email.toLowerCase().trim();
+  const code = storeCode(normalizedEmail);
+  const result = await sendVerificationEmail(normalizedEmail, code);
+
   if (!result.success) {
-    console.warn(`Failed to send verification email to ${email}: ${result.error}`);
-    // Still log the code for dev/demo purposes
-    console.log(`[DEV] Verification code for ${email}: ${code}`);
+    console.warn(`Failed to send verification email to ${normalizedEmail}: ${result.error}`);
+    // Development fallback only; production callers must treat this as failure.
+    console.log(`[DEV] Verification code for ${normalizedEmail}: ${code}`);
   }
+
+  return {
+    code,
+    sent: result.success,
+    ...(result.error ? { error: result.error } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -121,16 +140,23 @@ router.post("/send-verification", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Email is already verified" });
     }
 
-    const code = storeCode(normalizedEmail);
-    await sendVerificationEmailInternal(normalizedEmail, code);
+    const delivery = await createAndSendVerificationCode(normalizedEmail);
 
-    // Return the code in the response so the UI can display it (dev/demo mode).
-    // In production, remove `code` from the response and rely on the email.
-    return res.status(200).json({
+    if (!delivery.sent && process.env.NODE_ENV === "production") {
+      return res.status(503).json({
+        error: "The verification email could not be sent. Please try again later.",
+      });
+    }
+
+    const response: { message: string; devCode?: string } = {
       message: "Verification code sent",
-      // ⚠️  Remove the line below once real email delivery is configured:
-      devCode: code,
-    });
+    };
+
+    if (!delivery.sent && process.env.NODE_ENV !== "production") {
+      response.devCode = delivery.code;
+    }
+
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Send verification error:", error);
     return res.status(500).json({ error: "Failed to send verification code" });

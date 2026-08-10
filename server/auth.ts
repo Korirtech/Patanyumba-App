@@ -3,7 +3,7 @@ import express, { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { userQueries } from "./db.js";
 import { signToken, authenticateToken } from "./jwt.js";
-import verificationRouter from "./verification.js";
+import verificationRouter, { createAndSendVerificationCode } from "./verification.js";
 
 type UserRole = "admin" | "landlord" | "client";
 
@@ -110,41 +110,39 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
       password: hashedPassword,
       role,
       status: "active",
-      emailVerified: 1,
+      emailVerified: 0,
       createdAt: new Date().toISOString(),
     };
 
     userQueries.create(newUser);
 
-    // --- Generate and (simulate) send verification code ---
-    // Import the code generator inline to avoid circular deps
-    const { randomInt } = await import("node:crypto");
-    const verificationCode = String(randomInt(100_000, 999_999));
+    // --- Generate, store, and send the verification code ---
+    const delivery = await createAndSendVerificationCode(newUser.email);
 
-    // Store the code in the in-memory map via the verification module
-    // We re-export a helper for this so the router doesn't need to know internals
-    (globalThis as any).__pendingVerificationCodes = (globalThis as any).__pendingVerificationCodes || new Map();
-    (globalThis as any).__pendingVerificationCodes.set(newUser.email, {
-      code: verificationCode,
-      expiresAt: Date.now() + 15 * 60 * 1000,
-      attempts: 0,
-    });
+    // Do not leave an account that can never be verified when the production
+    // email service is unavailable. In development, the API returns devCode so
+    // the flow can still be tested without SMTP credentials.
+    if (!delivery.sent && process.env.NODE_ENV === "production") {
+      userQueries.delete(newUser.id);
+      return res.status(503).json({
+        error: "Registration is temporarily unavailable because the verification email could not be sent. Please try again later.",
+      });
+    }
 
-    console.log(`[Verification] New user ${newUser.email} – code: ${verificationCode}`);
+    const response: {
+      user: ReturnType<typeof sanitizeUser>;
+      requiresVerification: true;
+      devCode?: string;
+    } = {
+      user: sanitizeUser(newUser as UserRecord),
+      requiresVerification: true,
+    };
 
-    // --- Issue a short-lived token scoped only for verification ---
-    // The full JWT (with dashboard access) is issued after email verification.
-    const token = signToken({
-      userId: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
-    });
+    if (!delivery.sent && process.env.NODE_ENV !== "production") {
+      response.devCode = delivery.code;
+    }
 
-    return res.status(201).json({
-      token,
-      user: sanitizeUser({ ...newUser, emailVerified: 1 } as UserRecord),
-      requiresVerification: false,
-    });
+    return res.status(201).json(response);
   } catch (error) {
     console.error("Registration error:", error);
     return res.status(500).json({ error: "Registration failed" });

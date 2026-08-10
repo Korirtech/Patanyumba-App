@@ -14,4 +14,18 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 7d
+      # Set these values in the Render dashboard. The SMTP credentials must
+      # be stored as secrets and should never be committed to the repository.
+      - key: APP_URL
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
     healthCheckPath: /

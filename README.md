@@ -147,6 +147,21 @@ Administrators have comprehensive control over the property lifecycle, including
 
 Open your browser and visit: `http://localhost:3000`
 
+### Email verification configuration
+
+Registration creates an **unverified** account, generates a six-digit code, and sends it through SMTP. Configure the following environment variables before testing email verification:
+
+```env
+APP_URL=https://your-deployed-domain.example
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-sender@example.com
+SMTP_PASS=your-smtp-password-or-provider-token
+SMTP_FROM=your-sender@example.com
+```
+
+For Gmail, use an **App Password** rather than the account password. On Render, set these values in the service environment settings; `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and `APP_URL` are marked as unsynchronized secrets in `render.yaml`. In production, registration returns an explicit error when the verification email cannot be delivered instead of creating an account that cannot be verified. In development, the code is returned as `devCode` only when SMTP delivery is unavailable, so the flow can still be tested locally.
+
 ---
 
 ## 📂 Project Structure
@@ -191,6 +206,7 @@ The application includes an account for Admin logins.
 | `pnpm start` | Run the production server |
 | `pnpm preview` | Preview the production frontend |
 | `pnpm check` | Run TypeScript type checking |
+| `pnpm test:server` | Run the server registration and email verification tests |
 | `pnpm format` | Format the project using Prettier |
 
 ---

@@ -116,11 +116,11 @@ export function initializeDatabase() {
   // Migrate – add `emailVerified` column to users if it does not exist
   const userCols = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
   if (!userCols.find((c) => c.name === "emailVerified")) {
-    db.exec("ALTER TABLE users ADD COLUMN emailVerified INTEGER NOT NULL DEFAULT 1");
+    db.exec("ALTER TABLE users ADD COLUMN emailVerified INTEGER NOT NULL DEFAULT 0");
     console.log("✓ Migrated: added `emailVerified` column to users table.");
   }
-  // Ensure all users are verified so they can log in at any time
-  db.exec("UPDATE users SET emailVerified = 1");
+  // Existing verification state is preserved. New records default to
+  // unverified through the schema and userQueries.create().
 
   // Seed default admin account if it does not already exist
   seedAdminUser();
