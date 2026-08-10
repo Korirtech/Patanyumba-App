@@ -110,7 +110,7 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
       password: hashedPassword,
       role,
       status: "active",
-      emailVerified: 0,
+      emailVerified: 1,
       createdAt: new Date().toISOString(),
     };
 
@@ -142,10 +142,8 @@ router.post("/register", async (req: Request<{}, {}, RegisterRequest>, res: Resp
 
     return res.status(201).json({
       token,
-      user: sanitizeUser(newUser as UserRecord),
-      // ⚠️  devCode: remove once real email delivery is configured
-      devCode: verificationCode,
-      requiresVerification: true,
+      user: sanitizeUser({ ...newUser, emailVerified: 1 } as UserRecord),
+      requiresVerification: false,
     });
   } catch (error) {
     console.error("Registration error:", error);
