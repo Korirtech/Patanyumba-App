@@ -174,7 +174,7 @@ The application includes an account for Admin logins.
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | `pakanyumbaadmin@gmail.com` | `Paka123456` |
+| Admin | `patanyumbaadmin@gmail.com` | `Pata123456` |
 
 > **Note**
 > - User sessions and preferences are stored in **LocalStorage**.
