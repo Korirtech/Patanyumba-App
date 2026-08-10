@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Menu, X, Moon, Sun, LogOut, UserCircle, Building2, Contrast } from "lucide-react";
+import { Menu, X, Moon, Sun, LogOut, UserCircle, Building2, Contrast, ChevronDown, Home, MapPin, Info, Phone, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 import BrandMark from "@/components/BrandMark";
 
 const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/properties", label: "Properties" },
-  { href: "/counties", label: "Counties" },
-  { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact" },
+  { href: "/", label: "Home", icon: Home },
+  { href: "/properties", label: "Properties", icon: List },
+  { href: "/counties", label: "Counties", icon: MapPin },
+  { href: "/about", label: "About", icon: Info },
+  { href: "/contact", label: "Contact", icon: Phone },
 ];
 
 export default function Navbar() {
@@ -24,12 +24,11 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 12);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [location]);
@@ -44,16 +43,16 @@ export default function Navbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full border-b border-border/60 transition-all duration-200",
+        "sticky top-0 z-50 w-full transition-all duration-300",
         scrolled
-          ? "bg-background/85 backdrop-blur-xl shadow-sm"
-          : "bg-background/60 backdrop-blur-md"
+          ? "bg-background/90 backdrop-blur-2xl shadow-md border-b border-border/50"
+          : "bg-background/70 backdrop-blur-xl border-b border-transparent"
       )}
     >
       <div className="container flex h-16 items-center justify-between gap-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <BrandMark />
+        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+          <BrandMark className="transition-transform duration-200 group-hover:scale-105" />
           <span className="font-display text-xl font-extrabold tracking-tight">
             <span className="text-primary">Pata</span>
             <span className="text-foreground">Nyumba</span>
@@ -61,7 +60,7 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden md:flex items-center gap-0.5">
           {navLinks.map((link) => {
             const isActive =
               link.href === "/"
@@ -72,12 +71,15 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200",
+                  "relative rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-accent text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                    ? "text-primary bg-primary/8"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                 )}
               >
+                {isActive && (
+                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full bg-primary" />
+                )}
                 {link.label}
               </Link>
             );
@@ -85,14 +87,14 @@ export default function Navbar() {
         </nav>
 
         {/* Right actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Theme toggle */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
             aria-label="Toggle dark mode"
-            className="rounded-full h-9 w-9"
+            className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
           >
             {theme === "dark" ? (
               <Sun className="h-4 w-4" />
@@ -108,7 +110,7 @@ export default function Navbar() {
             onClick={toggleHighContrast}
             aria-label={highContrast ? "Disable high contrast mode" : "Enable high contrast mode"}
             aria-pressed={highContrast}
-            className="rounded-full h-9 w-9"
+            className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
             title="High contrast"
           >
             <Contrast className="h-4 w-4" />
@@ -117,8 +119,14 @@ export default function Navbar() {
           {user ? (
             <div className="hidden md:flex items-center gap-2">
               <Link href={dashboardPath}>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <UserCircle className="h-4 w-4" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 rounded-full border-primary/30 hover:border-primary/60 hover:bg-primary/5"
+                >
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                    {user.name?.charAt(0).toUpperCase() || "U"}
+                  </div>
                   <span className="max-w-[100px] truncate">{user.name}</span>
                 </Button>
               </Link>
@@ -127,7 +135,7 @@ export default function Navbar() {
                 size="icon"
                 onClick={logout}
                 aria-label="Logout"
-                className="h-9 w-9"
+                className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -135,12 +143,21 @@ export default function Navbar() {
           ) : (
             <div className="hidden md:flex items-center gap-2">
               <Link href="/login">
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full font-medium"
+                >
                   Login
                 </Button>
               </Link>
               <Link href="/register">
-                <Button size="sm">Register</Button>
+                <Button
+                  size="sm"
+                  className="rounded-full font-medium shadow-sm shadow-primary/20 hover:shadow-primary/30"
+                >
+                  Get Started
+                </Button>
               </Link>
             </div>
           )}
@@ -151,87 +168,110 @@ export default function Navbar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden rounded-lg"
+                className="md:hidden rounded-full h-9 w-9"
                 aria-label="Open menu"
               >
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] sm:w-[320px]">
-              <div className="flex flex-col gap-4 pt-6">
-                <div className="flex items-center justify-between px-2">
-                  <span className="font-display text-lg font-bold">
-                    <span className="text-primary">Pata</span>Nyumba
-                  </span>
+            <SheetContent side="right" className="w-[300px] sm:w-[340px] p-0">
+              <div className="flex flex-col h-full">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                  <Link href="/" className="flex items-center gap-2">
+                    <BrandMark className="h-7 w-7" />
+                    <span className="font-display text-lg font-extrabold">
+                      <span className="text-primary">Pata</span>
+                      <span className="text-foreground">Nyumba</span>
+                    </span>
+                  </Link>
                   <SheetClose asChild>
-                    <Button variant="ghost" size="icon" className="rounded-lg">
-                      <X className="h-5 w-5" />
+                    <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                      <X className="h-4 w-4" />
                     </Button>
                   </SheetClose>
                 </div>
 
-                <nav className="flex flex-col gap-1">
+                {/* Nav links */}
+                <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
                   {navLinks.map((link) => {
                     const isActive =
                       link.href === "/"
                         ? location === "/"
                         : location.startsWith(link.href);
+                    const Icon = link.icon;
                     return (
                       <SheetClose asChild key={link.href}>
                         <Link
                           href={link.href}
                           className={cn(
-                            "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                            "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
                             isActive
-                              ? "bg-accent text-primary"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                              ? "bg-primary/10 text-primary"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                           )}
                         >
+                          <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-primary" : "")} />
                           {link.label}
+                          {isActive && (
+                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                          )}
                         </Link>
                       </SheetClose>
                     );
                   })}
                 </nav>
 
-                {/* Mobile display preferences */}
-                <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-muted/50">
-                  <span className="text-sm font-medium">Dark mode</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleTheme}
-                    aria-label="Toggle dark mode"
-                    className="h-8 w-8 rounded-full"
-                  >
-                    {theme === "dark" ? (
-                      <Sun className="h-4 w-4" />
-                    ) : (
-                      <Moon className="h-4 w-4" />
-                    )}
-                  </Button>
+                {/* Preferences */}
+                <div className="px-3 py-3 border-t border-border space-y-1">
+                  <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-muted/40">
+                    <span className="text-sm font-medium">Dark mode</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={toggleTheme}
+                      aria-label="Toggle dark mode"
+                      className="h-8 w-8 rounded-full"
+                    >
+                      {theme === "dark" ? (
+                        <Sun className="h-4 w-4" />
+                      ) : (
+                        <Moon className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-muted/40">
+                    <span className="text-sm font-medium">High contrast</span>
+                    <Button
+                      variant={highContrast ? "default" : "ghost"}
+                      size="icon"
+                      onClick={toggleHighContrast}
+                      aria-label="Toggle high contrast"
+                      aria-pressed={highContrast}
+                      className="h-8 w-8 rounded-full"
+                    >
+                      <Contrast className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-muted/50">
-                  <span className="text-sm font-medium">High contrast</span>
-                  <Button
-                    variant={highContrast ? "default" : "ghost"}
-                    size="icon"
-                    onClick={toggleHighContrast}
-                    aria-label={highContrast ? "Disable high contrast mode" : "Enable high contrast mode"}
-                    aria-pressed={highContrast}
-                    className="h-8 w-8 rounded-full"
-                  >
-                    <Contrast className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="border-t border-border pt-4">
+                {/* Auth actions */}
+                <div className="px-4 py-4 border-t border-border">
                   {user ? (
-                    <div className="flex flex-col gap-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 px-2 py-2 mb-1">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-sm shrink-0">
+                          {user.name?.charAt(0).toUpperCase() || "U"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">{user.name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                        </div>
+                      </div>
                       <SheetClose asChild>
                         <Link href={dashboardPath}>
-                          <Button variant="outline" className="w-full gap-2">
+                          <Button variant="outline" className="w-full gap-2 rounded-xl">
                             <Building2 className="h-4 w-4" />
                             Dashboard
                           </Button>
@@ -240,7 +280,7 @@ export default function Navbar() {
                       <SheetClose asChild>
                         <Button
                           variant="ghost"
-                          className="w-full gap-2 justify-start"
+                          className="w-full gap-2 justify-start rounded-xl text-destructive hover:bg-destructive/10"
                           onClick={logout}
                         >
                           <LogOut className="h-4 w-4" />
@@ -249,17 +289,17 @@ export default function Navbar() {
                       </SheetClose>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2">
+                    <div className="space-y-2">
                       <SheetClose asChild>
                         <Link href="/login">
-                          <Button variant="outline" className="w-full">
+                          <Button variant="outline" className="w-full rounded-xl">
                             Login
                           </Button>
                         </Link>
                       </SheetClose>
                       <SheetClose asChild>
                         <Link href="/register">
-                          <Button className="w-full">Register</Button>
+                          <Button className="w-full rounded-xl">Get Started</Button>
                         </Link>
                       </SheetClose>
                     </div>
